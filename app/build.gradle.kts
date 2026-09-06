@@ -21,10 +21,7 @@ android {
                 arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
             }
         }
-        ndk {
-            // 双 ABI: arm64-v8a (主力) + armeabi-v7a (老设备)
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
+        // ABI 由 splits 统一控制 (ndk.abiFilters 与 splits 不能同时存在)
     }
 
     splits {
