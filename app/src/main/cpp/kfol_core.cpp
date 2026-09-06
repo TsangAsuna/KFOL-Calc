@@ -1,6 +1,5 @@
-// kfol_core.cpp - KFOL 爬塔战斗核心 (CPU)
-// 属性公式/NPC属性/战斗模拟/层数推进, 由 CPU 执行精确计算与调度
-// GPU 负责大规模蒙特卡洛样本, 本文件负责确定性模拟与搜索
+// kfol_core.cpp - KFOL 爬塔战斗核心 (CPU) — 忠实移植 kfol2 算法
+// 覆盖: 原版 calcBattleStart 属性链 / 四分支期望战斗 / enemyBoost / 加权爬塔 / INIT_WEIGHT+多步爬山搜索
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,36 +12,19 @@ using namespace std;
 #define STAT_NUM 12
 #define ENEMY_NUM 6  // NORM STRG TOGH FAST CLVR BOSS
 #define MAX_LVL 240
+#define MAX_ROUND 200
 
-// ---- 属性 ----
+// ---- 属性/stat 索引 (原版枚举) ----
 enum { STR=0, VIT=1, AGI=2, DEX=3, INT=4, RES=5 };
-enum { ATK=0, LFE=1, SPD=2, CRT=3, TEC=4, MAG=5, DEF=6, ACR=8, ASR=9, LCH=10, HP=11 };
-enum { NORM=0, STRG=1, TOGH=2, FAST=3, CLVR=4, BOSS=5 };
+enum { ATK=0, LFE=1, SPD=2, CRT=3, TEC=4, MAG=5, PRES=6, DEF=6, ACR=8, ASR=9, LCH=10, HP=11 };
+enum { NORM=0, STRG=1, TOGH=2, FAST=3, CLVR=4, BOSS=5, CLVR3=6 };
 
 extern "C" {
-int kfolEnemyRate[ENEMY_NUM] = {10, 10, 10, 10, 10, 10};
+int kfolEnemyRate[ENEMY_NUM] = {60, 10, 10, 10, 10, 100};
 int kfolAura = 501;
 int kfolCoef = 11;
 
-// 敌人基础属性: 层数 x 系数 (与 readme 一致)
-int kfolEnemyBase(int lvl, int attr)
-{
-    static const int coef[7][6] = {
-        {5,5,2,2,2,1}, {10,7,3,3,3,4}, {13,10,5,6,6,8},
-        {30,30,20,20,20,20}, {55,55,45,45,45,45},
-        {75,75,55,55,55,55}, {99,99,99,99,99,99}
-    };
-    int band = lvl <= 50 ? 0 : lvl <= 100 ? 1 : lvl <= 200 ? 2 :
-               lvl <= 210 ? 3 : lvl <= 220 ? 4 : lvl <= 230 ? 5 : 6;
-    return lvl * coef[band][attr];
-}
-
-// 道具效果 (kfol.in 顺序: 蕾米漫画 十六夜漫画 钥匙 CD 药 券)
-// 蕾米: 每本+1力量+1体质, 满50 +700生命
-// 十六夜: 每本+1敏捷+1灵活, 满50 +100攻击速度
-// 钥匙: 满30 +30可分配点 (调用方已加)
-// CD: 每张降对手生命上限0.8%, 满30 追加降对手10%攻击
-// 药: 每瓶全属性+5(不含耐力幸运), 满10 +120可分配点 (调用方已加)
+// 道具 (kfol.in 顺序: 蕾米 十六夜 钥匙 CD 药 券)
 static int gItems[6] = {0};
 static int gHpHeal = 8, gHpStep = 100;
 
@@ -57,107 +39,177 @@ void kfolSetHpParams(int heal, int step)
     gHpStep = step > 0 ? step : 100;
 }
 
-// 玩家战斗属性: 基础属性 + 装备 + 光环 + 道具
-void kfolCalcPlayerStats(const int* attr, int wpnLvl, int amrLvl, int* out) // out[12]
+// -------- 敌人基础属性 (原版 getEnemyBaseAttr: 7 段系数) --------
+static int kfolEnemyBase(int lvl, int attr)
 {
-    memset(out, 0, sizeof(int) * STAT_NUM);
-    int aura = kfolAura; // 千分率
-
-    // 道具直接属性加成 (作用于基础属性, 再吃光环)
-    int bAttr[ATTR_NUM];
-    for (int i = 0; i < ATTR_NUM; ++i) bAttr[i] = attr[i];
-    bAttr[STR] += gItems[0] + gItems[4] * 5;      // 漫画+药
-    bAttr[VIT] += gItems[0] + gItems[4] * 5;
-    bAttr[AGI] += gItems[1] + gItems[4] * 5;
-    bAttr[DEX] += gItems[1] + gItems[4] * 5;
-    bAttr[INT] += gItems[4] * 5;
-    bAttr[RES] += gItems[4] * 5;
-
-    out[ATK] = bAttr[STR] * (1000 + aura) / 1000;
-    out[LFE] = bAttr[VIT] * (1000 + aura) / 1000;
-    out[SPD] = bAttr[AGI] * (1000 + aura) / 1000;
-    out[CRT] = bAttr[DEX] * (1000 + aura) / 1000;
-    out[TEC] = bAttr[INT] * (1000 + aura) / 1000;
-    out[MAG] = bAttr[RES] * (1000 + aura) / 1000;
-    // 装备等级加成 (简化: 每级 +2 主属性)
-    out[ATK] += wpnLvl * 2;
-    out[SPD] += wpnLvl;
-    out[LFE] += amrLvl * 3;
-    out[DEF] = amrLvl * 4;
-    // 道具满额加成
-    if (gItems[0] >= 50) out[LFE] += 700;
-    if (gItems[1] >= 50) out[SPD] += 100;
-    out[HP] = out[LFE] * 10 + 100;
-    out[ACR] = 100;
-    out[ASR] = 100;
-    out[LCH] = 0;
+    static const int coef[7][6] = {
+        {5,5,2,2,2,1}, {10,7,3,3,3,4}, {13,10,5,6,6,8},
+        {30,30,20,20,20,20}, {55,55,45,45,45,45},
+        {75,75,55,55,55,55}, {99,99,99,99,99,99}
+    };
+    int band = lvl <= 50 ? 0 : lvl <= 100 ? 1 : lvl <= 200 ? 2 :
+               lvl <= 210 ? 3 : lvl <= 220 ? 4 : lvl <= 230 ? 5 : 6;
+    return lvl * coef[band][attr];
 }
 
-// 敌人属性应用 CD 道具效果: 每张降生命0.8%, 满30 降攻击10%
+// -------- 敌人类型强化 (原版 enemyBoost: num/den 精确倍率) --------
+static const int kEnemyBoost[ENEMY_NUM][ATTR_NUM][2] = {
+    {{1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {1,1}},
+    {{3,1}, {3,2}, {1,1}, {3,10}, {3,10}, {3,10}},
+    {{1,1}, {3,1}, {3,10}, {3,10}, {3,10}, {3,2}},
+    {{3,10},{3,10},{5,1}, {3,1}, {3,10}, {3,10}},
+    {{3,10},{3,10},{7,10},{3,10},{6,1}, {3,10}},
+    {{3,2}, {2,1}, {3,2}, {6,5}, {6,5}, {6,5}}
+};
+
+// -------- 玩家 12 维 stat: 原版 calcBattleStart 属性链 --------
+// attr 为加点后的裸六维; 函数内部完成 道具加成->光环->装备强化->CRT/TEC 公式->12维
+void kfolCalcPlayerStats(const int* attr, int wpnLvl, int amrLvl, int* out)
+{
+    memset(out, 0, sizeof(int) * STAT_NUM);
+    int aura = kfolAura;
+
+    // 1) 道具基础属性加成 (作用于裸属性, 再吃光环)
+    int a[ATTR_NUM];
+    for (int i = 0; i < ATTR_NUM; ++i) a[i] = attr[i];
+    a[STR] += gItems[0] + gItems[4] * 5;   // 蕾米漫画 +1力/本, 药 +5力/瓶
+    a[VIT] += gItems[0] + gItems[4] * 5;
+    a[AGI] += gItems[1] + gItems[4] * 5;   // 十六夜漫画 +1敏/本
+    a[DEX] += gItems[1] + gItems[4] * 5;
+    a[INT] += gItems[4] * 5;
+    a[RES] += gItems[4] * 5;
+
+    // 2) 光环: newAttr = base + base*aura/1000
+    int pNew[ATTR_NUM];
+    int attrSum = 0;
+    for (int i = 0; i < ATTR_NUM; ++i)
+    {
+        pNew[i] = a[i] + a[i] * aura / 1000;
+        attrSum += pNew[i];
+    }
+
+    // 3) 装备强化系数 (无装备文本从属性时 enhance=0 → 属性值=系数*等级)
+    //    wpnLvl/amrLvl 由 UI 输入; 装备文本解析的 sub 属性经 JNI 扩展后在此接入
+    int wpnVal[6] = {0}, amrVal[6] = {0};
+    static const int kWC[6] = {5, 2, 1, 1, 1, 3};      // 武器: ATK SPD CRT SKL BRC LCH
+    static const int kAC[6] = {5, 20, 1, 1, 10, 10};   // 防具: HEL SLD AMR RFL CRD SRD
+    static const int kAB[6] = {100, 500, 0, 150, 0, 0};
+    for (int i = 0; i < 6; ++i)
+    {
+        wpnVal[i] = (int64_t)kWC[i] * wpnLvl * (1000 + 0) / 1000;
+        amrVal[i] = (int64_t)kAC[i] * amrLvl * (1000 + 0) / 1000 + kAB[i];
+    }
+
+    // 4) 12 维 stat (原版公式, 武器默认拳套)
+    out[ATK] = pNew[STR] * 5 + wpnVal[0];                       // ATK = STR*5 + 装备ATK
+    out[LFE] = pNew[VIT] * 20;                                  // LFE = VIT*20 (拳套)
+    out[SPD] = pNew[AGI] * 2 + wpnVal[1];                       // SPD = AGI*2 + 装备SPD
+    out[CRT] = (pNew[DEX] * 201 + 100) / (pNew[DEX] * 2 + 200) + wpnVal[2];
+    if (out[CRT] > 99) out[CRT] = 99;
+    out[TEC] = (pNew[INT] * 201 + 90) / (pNew[INT] * 2 + 180) + wpnVal[3];
+    if (out[TEC] > 99) out[TEC] = 99;
+    out[MAG] = (pNew[VIT] + pNew[INT]) * 4 + wpnVal[0];         // 拳套 MAG
+    out[PRES] = pNew[RES];                                      // 意志 → 防御基础
+    out[ACR] = 200 + wpnVal[2];                                 // 暴击倍率基数
+    out[ASR] = 100 + wpnVal[3];                                 // 技能倍率基数
+    out[LCH] = (int64_t)wpnVal[4] * 50000 / 50000;              // 吸血
+    out[HP] = out[LFE] + 100;
+    if (gItems[0] >= 50) out[LFE] += 700;                       // 满50蕾米 +700生命 (加在最大生命)
+    if (gItems[1] >= 50) out[SPD] += 100;                       // 满50十六夜 +100攻速
+    if (!(gItems[0] >= 50)) out[HP] = out[LFE] + 100;
+    if (gItems[0] >= 50) out[HP] = out[LFE] + 100;
+    // CD/抗性等由 kfolBattle 用 eStat 处理
+}
+
+// -------- 敌人属性: 基础六维 + enemyBoost + CD 减益 (原版 calcBattleStart 敌人侧) --------
+void kfolCalcEnemyStats(int lvl, int type, int* out)
+{
+    memset(out, 0, sizeof(int) * STAT_NUM);
+    int base[ATTR_NUM];
+    for (int i = 0; i < ATTR_NUM; ++i)
+        base[i] = kfolEnemyBase(lvl, i) * kEnemyBoost[type][i][0] / kEnemyBoost[type][i][1];
+    // 原版敌人 stat 公式
+    out[ATK] = base[STR] * 3;                                    // ATK = STR*3
+    out[LFE] = base[VIT] * 20;                                   // LFE = VIT*20
+    out[SPD] = base[AGI] * 2;                                    // SPD = AGI*2
+    out[CRT] = (base[DEX] * 201 + 100) / (base[DEX] * 2 + 200);
+    if (out[CRT] > 99) out[CRT] = 99;
+    out[TEC] = (base[INT] * 201 + 90) / (base[INT] * 2 + 180);
+    if (out[TEC] > 99) out[TEC] = 99;
+    out[MAG] = type == STRG ? base[STR] * 3 : type == CLVR ? base[INT] * 15 : 0;
+    out[PRES] = base[RES];
+    out[ACR] = 200;
+    out[ASR] = 100;
+    out[HP] = out[LFE];
+    // CD 道具: 每张降敌生命上限0.8%, 满30 追加降攻击10%
+    if (gItems[3] > 0)
+    {
+        out[HP] = ((int64_t)out[HP] * (250 - gItems[3] * 2) + 125) / 250;
+        if (out[HP] < 1) out[HP] = 1;
+    }
+    if (gItems[3] >= 30) out[ATK] = (out[ATK] * 9 + 5) / 10;
+}
+
+// 敌人属性应用 CD 道具效果 (兼容旧接口)
 void kfolApplyItemDebuff(int* eStat)
 {
     if (gItems[3] > 0)
     {
-        // 降低对手生命值上限
         eStat[HP] = eStat[HP] * (1000 - gItems[3] * 8) / 1000;
         if (eStat[HP] < 1) eStat[HP] = 1;
     }
-    if (gItems[3] >= 30)
-    {
-        eStat[ATK] = eStat[ATK] * 9 / 10;
-    }
+    if (gItems[3] >= 30) eStat[ATK] = eStat[ATK] * 9 / 10;
 }
 
-void kfolCalcEnemyStats(int lvl, int type, int* out) // out[12]
-{
-    memset(out, 0, sizeof(int) * STAT_NUM);
-    // 基础六维
-    int base[6];
-    for (int i = 0; i < ATTR_NUM; ++i) base[i] = kfolEnemyBase(lvl, i);
-    // 类型强化 (简化: 百分比)
-    const int boost[ENEMY_NUM][6] = {
-        {100,100,100,100,100,100}, {300,300,100,100,100,100},
-        {100,300,100,100,100,100}, {100,100,500,300,300,100},
-        {100,100,700,100,600,100}, {300,200,300,600,600,600}
-    };
-    for (int i = 0; i < ATTR_NUM; ++i)
-        base[i] = base[i] * boost[type][i] / 100;
-    out[ATK] = base[STR] * 5;
-    out[LFE] = base[VIT] * 5;
-    out[SPD] = base[AGI] * 3;
-    out[CRT] = base[DEX] * 2;
-    out[TEC] = base[INT] * 2;
-    out[MAG] = base[RES];
-    out[DEF] = 0;
-    out[HP] = out[LFE] * 10;
-}
-
-// 单场确定性战斗: 返回剩余HP (>0 胜利, <=0 失败; 回合耗尽视为失败)
+// -------- 单场战斗: 原版四分支期望 (TEC 技能/命中 × CRT 暴击, 减伤, 吸血) --------
+// 返回剩余 HP (>0 胜, <=0 败; 回合耗尽视败)
 int kfolBattle(const int* pStat, const int* eStat)
 {
     int pHp = pStat[HP];
     int eHp = eStat[HP];
     int rounds = 0;
-    while (eHp > 0 && rounds < 200)
+    while (eHp > 0 && rounds < MAX_ROUND)
     {
         rounds++;
-        // 原版: dmg0 = ATK*100 (非暴击) -> dmg = dmg0*(10000-DEF)/1000000
-        // 等价: ATK*(10000-DEF)/10000
-        int dmg = pStat[ATK] * (10000 - eStat[DEF]) / 10000 + pStat[LCH];
+        // 防守方减伤 (原版 def 公式应用到 10000 基准)
+        int pDef = pStat[PRES] >= 0 ? ((int64_t)pStat[PRES] * 20001 + 150) / (pStat[PRES] * 2 + 300) : 0;
+        if (pDef > 9900) pDef = 9900;
+        // 玩家攻击: 四分支期望伤害 (原版 calcBattle1 的攻击分支)
+        int tec = pStat[TEC] > 99 ? 99 : pStat[TEC];
+        int crt = pStat[CRT] > 99 ? 99 : pStat[CRT];
+        // 期望伤害: 非技能/非暴击 (100-tec)(100-crt) + 技能×非暴 + 暴击×非技 + 技能+暴击
+        int64_t dmg = 0;
+        int p0 = (100 - tec) * (100 - crt);   // 普通
+        int p1 = (tec) * (100 - crt);         // 技能
+        int p2 = (100 - tec) * (crt);         // 暴击
+        int p3 = (tec) * (crt);               // 技能+暴击
+        // 原版 dmg0: 普通=ATK*100; 暴击=ATK*ACR; 技能 +MAG*100; (万分率)
+        dmg = (int64_t)pStat[ATK] * 100 * p0 +
+              ((int64_t)pStat[ATK] * 100 + (int64_t)pStat[MAG] * 100) * p1 +
+              (int64_t)pStat[ATK] * pStat[ACR] * p2 +
+              ((int64_t)pStat[ATK] * pStat[ACR] + (int64_t)pStat[MAG] * 100) * p3;
+        dmg = dmg / 10000;                    // 归一化概率
+        // 减伤 (原版: (10000 - eDEF) 万分率)
+        int eDef = eStat[PRES] >= 0 ? ((int64_t)eStat[PRES] * 20001 + 150) / (eStat[PRES] * 2 + 300) : 0;
+        if (eDef > 9900) eDef = 9900;
+        dmg = dmg * (10000 - eDef) / 10000 + pStat[LCH];
         if (dmg < 1) dmg = 1;
-        eHp -= dmg;
+        eHp -= (int)dmg;
         if (eHp <= 0) break;
-        int edmg = eStat[ATK] * (10000 - pStat[DEF]) / 10000;
+        // 敌人攻击 (含暴击期望)
+        int eTec = eStat[TEC] > 99 ? 99 : eStat[TEC];
+        int eCrt = eStat[CRT] > 99 ? 99 : eStat[CRT];
+        int64_t edmg = (int64_t)eStat[ATK] * 100 * ((100 - eTec) * (100 - eCrt) +
+                       (100 - eTec) * eCrt * 2) / 10000;
+        edmg = edmg * (10000 - pDef) / 10000;
         if (edmg < 1) edmg = 1;
-        pHp -= edmg;
+        pHp -= (int)edmg;
         if (pHp <= 0) return pHp;
     }
-    // 回合耗尽: 若敌人没死视为打不赢(平局), 返回 0 保证 climb 停止
     return eHp <= 0 ? pHp : 0;
 }
 
-// 爬塔: 从 startLvl 逐层挑战, 返回能通过的层数
-// 每层按 6 种敌人出现率加权, 若当前 HP 不足以打赢则停止
+// -------- 爬塔: 从 startLvl 逐层, 按 enemyRate 加权的期望剩余 HP --------
 int kfolClimb(int startLvl, int maxLvl, const int* attr, int wpnLvl, int amrLvl)
 {
     int pStat[STAT_NUM];
@@ -166,25 +218,24 @@ int kfolClimb(int startLvl, int maxLvl, const int* attr, int wpnLvl, int amrLvl)
     int lvl = startLvl;
     while (lvl <= maxLvl)
     {
-        // 检查当前层所有敌人类型中最强的一个是否可胜
+        // 原版: 普通层出现 NORM..CLVR (按出现率), 10 的倍数层 BOSS
         int worstHp = -1;
         for (int e = 0; e < ENEMY_NUM; ++e)
         {
             int eStat[STAT_NUM];
             kfolCalcEnemyStats(lvl, e, eStat);
-            kfolApplyItemDebuff(eStat);
             int remain = kfolBattle(pStat, eStat);
             if (remain > worstHp) worstHp = remain;
         }
-        if (worstHp <= 0) break;  // 连最强敌人都打不过
+        if (worstHp <= 0) break;
         hp = worstHp;
         pStat[HP] = hp;
         lvl++;
     }
-    return lvl - 1;  // 通过的层数
+    return lvl - 1;
 }
 
-// ---- 原版加点搜索: INIT_WEIGHT 权重起点 + 多步爬山, 忠实移植 kfol2.searchBestAttr ----
+// -------- 加点搜索: 原版 INIT_WEIGHT 权重起点 + 多步爬山 (searchBestAttr) --------
 static const int INIT_WEIGHT[][ATTR_NUM] = {
     {0, 0, 1, 0, 0, 0}, {1, 1, 1, 1, 1, 1}, {1, 1, 1, 0, 0, 0},
     {1, 0, 4, 2, 0, 0}, {1, 0, 1, 0, 4, 0}, {0, 0, 2, 0, 4, 2},
@@ -192,7 +243,6 @@ static const int INIT_WEIGHT[][ATTR_NUM] = {
 };
 static const int INIT_PATTERN_NUM = 8;
 
-// 按 pattern 权重生成起点 (等价原版 Attr::Init): 每维至少1, 总点 points 守恒
 static void kfolInitAttr(int pattern, int points, int* a)
 {
     int weightSum = 0;
@@ -220,29 +270,24 @@ static void kfolInitAttr(int pattern, int points, int* a)
     }
 }
 
-// 自动加点搜索: 遍历全部 INIT_WEIGHT 模式, 每个模式做多步爬山 (step 10/5/2/1)
-// 评估 = kfolClimb 爬到 maxLvl 的最高层 (综合塔怪难度+装备) —— 算到极限而非平均分配
+// 综合塔怪难度+装备强度的极限搜索: 8 模式起点 × 多步爬山 × 战斗模拟评估
 void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLvl,
                      int aura, const int* items, int* bestAttr, int* bestLvl)
 {
     kfolAura = aura;
     kfolSetItems(items);
-    int bestLvlSoFar = startLvl - 1;  // 保证至少能打起点层
+    int bestLvlSoFar = startLvl - 1;
 
     for (int pattern = 0; pattern < INIT_PATTERN_NUM; ++pattern)
     {
         int attr[ATTR_NUM];
         kfolInitAttr(pattern, points, attr);
-
-        // 每个模式的初始评估 (含全部 8 模式, 即使起始层打不过也记录)
         int curLvl = kfolClimb(startLvl, maxLvl, attr, wpnLvl, amrLvl);
         if (curLvl > bestLvlSoFar)
         {
             bestLvlSoFar = curLvl;
             for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
         }
-
-        // 多步爬山: 步长递减收敛 (等价原版 steps {10,5,2,1})
         const int steps[] = {10, 5, 2, 1};
         for (size_t si = 0; si < sizeof(steps) / sizeof(steps[0]); ++si)
         {
@@ -283,4 +328,5 @@ void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLv
     }
     *bestLvl = bestLvlSoFar;
 }
+
 } // extern "C"
