@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "KFOLCalc"
-include ':app'
+include ":app"
