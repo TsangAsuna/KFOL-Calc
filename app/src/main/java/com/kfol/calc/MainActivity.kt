@@ -138,7 +138,7 @@ class MainActivity : AppCompatActivity() {
 
         // 一键粘贴装备
         pasteBtn.setOnClickListener {
-            pasteFromClipboard(equipInput) { "已粘贴装备 ${it.length} 字符" }
+            pasteFromClipboard(equipInput) { "已粘贴装备 $it 字符" }
         }
 
         // 解析装备
@@ -158,7 +158,7 @@ class MainActivity : AppCompatActivity() {
 
         // 一键粘贴高级选项
         pasteOptBtn.setOnClickListener {
-            pasteFromClipboard(optInput) { "已粘贴高级选项 ${it.length} 字符" }
+            pasteFromClipboard(optInput) { "已粘贴高级选项 $it 字符" }
         }
 
         searchBtn.setOnClickListener { startSearch() }
