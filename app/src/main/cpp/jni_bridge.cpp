@@ -18,7 +18,12 @@ int kfolGpuInit(void);
 int kfolGpuAvailable(void);
 void kfolCpuMcSimulate(const int*, const int*, const int*, const int*, const int*, int, int, float*, int*);
 void kfolCalcPlayerStats(const int*, int, int, int*);
-void kfolSearchAttrs(int, int, int, int, int, int*, int*);
+void kfolSearchAttrs(int, int, int, int, int, int, const int*, int*, int*);
+void kfolSetItems(const int*);
+void kfolSetHpParams(int, int);
+void kfolApplyItemDebuff(int*);
+void kfolCalcEnemyStats(int, int, int*);
+int kfolBattle(const int*, const int*);
 int kfolClimb(int, int, const int*, int, int);
 }
 
