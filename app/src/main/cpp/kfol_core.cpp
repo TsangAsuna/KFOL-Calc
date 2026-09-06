@@ -184,49 +184,103 @@ int kfolClimb(int startLvl, int maxLvl, const int* attr, int wpnLvl, int amrLvl)
     return lvl - 1;  // 通过的层数
 }
 
-// 自动加点搜索: 简单爬山 - 从平均分配开始, 逐个加点选择收益最大属性
-// 返回最优六维属性分配 (总点数 points, 每维至少 1)
+// ---- 原版加点搜索: INIT_WEIGHT 权重起点 + 多步爬山, 忠实移植 kfol2.searchBestAttr ----
+static const int INIT_WEIGHT[][ATTR_NUM] = {
+    {0, 0, 1, 0, 0, 0}, {1, 1, 1, 1, 1, 1}, {1, 1, 1, 0, 0, 0},
+    {1, 0, 4, 2, 0, 0}, {1, 0, 1, 0, 4, 0}, {0, 0, 2, 0, 4, 2},
+    {1, 1, 3, 3, 3, 0}, {3, 1, 3, 0, 0, 3}
+};
+static const int INIT_PATTERN_NUM = 8;
+
+// 按 pattern 权重生成起点 (等价原版 Attr::Init): 每维至少1, 总点 points 守恒
+static void kfolInitAttr(int pattern, int points, int* a)
+{
+    int weightSum = 0;
+    for (int i = 0; i < ATTR_NUM; ++i) weightSum += INIT_WEIGHT[pattern][i];
+    int basePoints = points - ATTR_NUM;
+    for (int i = 0; i < ATTR_NUM; ++i)
+    {
+        a[i] = basePoints * INIT_WEIGHT[pattern][i] / weightSum + 1;
+        if (a[i] < 1) a[i] = 1;
+        points -= a[i];
+    }
+    if (points > 0)
+    {
+        bool incWeightedOnly = true;
+        while (points)
+        {
+            bool changed = false;
+            for (int i = 0; i < ATTR_NUM; ++i)
+            {
+                if (points && (!incWeightedOnly || INIT_WEIGHT[pattern][i] > 0))
+                { ++a[i]; --points; changed = true; }
+            }
+            if (!changed) incWeightedOnly = false;
+        }
+    }
+}
+
+// 自动加点搜索: 遍历全部 INIT_WEIGHT 模式, 每个模式做多步爬山 (step 10/5/2/1)
+// 评估 = kfolClimb 爬到 maxLvl 的最高层 (综合塔怪难度+装备) —— 算到极限而非平均分配
 void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLvl,
                      int aura, const int* items, int* bestAttr, int* bestLvl)
 {
     kfolAura = aura;
     kfolSetItems(items);
-    int attr[ATTR_NUM];
-    // 平均分配起点
-    int base = points / ATTR_NUM;
-    for (int i = 0; i < ATTR_NUM; ++i) attr[i] = base;
-    int used = base * ATTR_NUM;
-    attr[0] += points - used;  // 余数给力量
+    int bestLvlSoFar = startLvl - 1;  // 保证至少能打起点层
 
-    int curLvl = kfolClimb(startLvl, maxLvl, attr, wpnLvl, amrLvl);
-    *bestLvl = curLvl;
-    for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
-
-    // 贪心: 若干轮, 每次微调 5% 点数测试增益
-    for (int iter = 0; iter < 40; ++iter)
+    for (int pattern = 0; pattern < INIT_PATTERN_NUM; ++pattern)
     {
-        bool improved = false;
-        for (int i = 0; i < ATTR_NUM; ++i)
+        int attr[ATTR_NUM];
+        kfolInitAttr(pattern, points, attr);
+
+        // 每个模式的初始评估 (含全部 8 模式, 即使起始层打不过也记录)
+        int curLvl = kfolClimb(startLvl, maxLvl, attr, wpnLvl, amrLvl);
+        if (curLvl > bestLvlSoFar)
         {
-            for (int j = 0; j < ATTR_NUM; ++j)
+            bestLvlSoFar = curLvl;
+            for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
+        }
+
+        // 多步爬山: 步长递减收敛 (等价原版 steps {10,5,2,1})
+        const int steps[] = {10, 5, 2, 1};
+        for (size_t si = 0; si < sizeof(steps) / sizeof(steps[0]); ++si)
+        {
+            int step = steps[si];
+            bool improved = true;
+            for (int iter = 0; iter < 8 && improved; ++iter)
             {
-                if (i == j || attr[i] <= 1) continue;
-                int test[ATTR_NUM];
-                for (int k = 0; k < ATTR_NUM; ++k) test[k] = attr[k];
-                test[i] -= 5; test[j] += 5;
-                if (test[i] < 1) continue;
-                int l = kfolClimb(startLvl, maxLvl, test, wpnLvl, amrLvl);
-                if (l > curLvl)
+                improved = false;
+                int bi = -1, bj = -1, bestDeltaLvl = curLvl;
+                for (int i = 0; i < ATTR_NUM; ++i)
                 {
-                    curLvl = l;
-                    for (int k = 0; k < ATTR_NUM; ++k) attr[k] = test[k];
+                    if (attr[i] - step < 1) continue;
+                    attr[i] -= step;
+                    for (int j = 0; j < ATTR_NUM; ++j)
+                    {
+                        if (j == i) continue;
+                        attr[j] += step;
+                        int l = kfolClimb(startLvl, maxLvl, attr, wpnLvl, amrLvl);
+                        if (l > bestDeltaLvl) { bestDeltaLvl = l; bi = i; bj = j; }
+                        attr[j] -= step;
+                    }
+                    attr[i] += step;
+                }
+                if (bi != -1 && bestDeltaLvl > curLvl)
+                {
+                    attr[bi] -= step;
+                    attr[bj] += step;
+                    curLvl = bestDeltaLvl;
                     improved = true;
+                    if (curLvl > bestLvlSoFar)
+                    {
+                        bestLvlSoFar = curLvl;
+                        for (int k = 0; k < ATTR_NUM; ++k) bestAttr[k] = attr[k];
+                    }
                 }
             }
         }
-        if (!improved) break;
     }
-    *bestLvl = curLvl;
-    for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
+    *bestLvl = bestLvlSoFar;
 }
 } // extern "C"
