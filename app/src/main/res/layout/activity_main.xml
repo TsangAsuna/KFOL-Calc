@@ -74,47 +74,131 @@
             android:text="道具数量 (按争夺界面顺序)"
             android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/itemRemInput"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="蕾米莉亚同人漫画 (满50 +700生命)"
-            android:inputType="number" />
+            android:orientation="horizontal">
 
-        <EditText
-            android:id="@+id/itemIzaInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="十六夜同人漫画 (满50 +100攻击速度)"
-            android:inputType="number" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="蕾米同人漫画 (+1力/体, 满50 +700生命)"
+                android:textSize="14sp" />
 
-        <EditText
-            android:id="@+id/itemKeyInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="档案室钥匙 (满30 +30可分配点)"
-            android:inputType="number" />
+            <EditText
+                android:id="@+id/itemRemInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:inputType="number" />
+        </LinearLayout>
 
-        <EditText
-            android:id="@+id/itemLolInput"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="傲娇LOLI娇蛮音CD (每张降敌生命0.8%)"
-            android:inputType="number" />
+            android:orientation="horizontal">
 
-        <EditText
-            android:id="@+id/itemYaoInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="消逝之药 (每瓶全属性+5)"
-            android:inputType="number" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="十六夜同人漫画 (+1敏/灵, 满50 +100攻速)"
+                android:textSize="14sp" />
 
-        <EditText
-            android:id="@+id/itemZheInput"
+            <EditText
+                android:id="@+id/itemIzaInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="整形优惠卷 (满10 获得[极]加成)"
-            android:inputType="number" />
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="档案室钥匙 (+1%盒子率, 满30 +30点)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/itemKeyInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="傲娇LOLI娇蛮音CD (降敌生命0.8%/张)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/itemLolInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="消逝之药 (全属性+5/瓶, 满10 +120点)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/itemYaoInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="整形优惠卷 (满10 [极]加成)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/itemZheInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:hint="0"
+                android:inputType="number" />
+        </LinearLayout>
 
         <!-- 分配点数: 实时计算最佳加点 -->
         <TextView
@@ -308,10 +392,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="top"
-            android:hint="例如: Cloth #90442450&#10;1 IMT&#10;4 AMR RFL CRD SLD&#10;8 HEL COF 5 ..."
+            android:hint="Cloth #90442450&#10;1 IMT&#10;4 AMR RFL CRD SLD&#10;8 HEL COF 5 HEL COF 2 SRD COF 5 SLD VIT 5 SRD COF 3 SLD DEX 5 AMR RES 3 HEL COF 2&#10;&#10;Sword #89545072&#10;1 AMT&#10;4 BRC CRT LCH SKL&#10;8 CRT INT 3 BRC AGI 3 BRC COF 4 BRC AGI 5 LCH COF 2 ATK STR 2 SPD AGI 2 BRC INT 5"
             android:inputType="textMultiLine"
-            android:minLines="4"
-            android:maxLines="8"
+            android:minLines="6"
+            android:maxLines="12"
             android:textSize="13sp" />
 
         <Button
