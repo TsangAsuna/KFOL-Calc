@@ -87,7 +87,7 @@ typedef struct {
 static GpuContext gGpu;
 
 // 尽力而为的 GPU 初始化探测 (若无 OpenCL 运行时, 返回 0, 调用方回退 CPU)
-int kfolGpuInit(void)
+extern "C" int kfolGpuInit(void)
 {
     // Android 上 OpenCL 库以 dlopen 方式加载, 若设备无 OpenCL 返回 0
     gGpu.initialized = 1;
@@ -96,14 +96,14 @@ int kfolGpuInit(void)
     return gGpu.devAvailable;
 }
 
-int kfolGpuAvailable(void)
+extern "C" int kfolGpuAvailable(void)
 {
     return gGpu.devAvailable;
 }
 
 // 入口: 接收一组战斗参数, 通过 OpenCL 计算胜率
 // 返回 0=成功(结果写入 outWinRate), 1=GPU不可用(调用方用CPU)
-int kfolGpuSimulate(
+extern "C" int kfolGpuSimulate(
     const int* pAttr, const int* pStat,
     const int* eAttr, const int* eStat, const int* eRate,
     int enemyNum, float* outWinRate, int* outWinCount)
@@ -116,7 +116,7 @@ int kfolGpuSimulate(
 }
 
 // CPU 回退: 纯 C 多线程蒙特卡洛 (OpenMP), 与 GPU 内核同一逻辑
-void kfolCpuMcSimulate(
+extern "C" void kfolCpuMcSimulate(
     const int* pAttr, const int* pStat,
     const int* eAttr, const int* eStat, const int* eRate,
     int enemyNum, int samplesPerEnemy,
