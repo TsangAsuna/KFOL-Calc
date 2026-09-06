@@ -6,20 +6,33 @@ plugins {
 android {
     namespace = "com.kfol.calc"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.kfol.calc"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
         externalNativeBuild {
             cmake {
                 cppFlags += listOf("-std=c++17", "-O3", "-fopenmp")
+                // 16KB 页对齐 (Android 15+/16 强制, 旧 NDK 4KB 对齐在新设备 loadLibrary 失败闪退)
+                arguments += listOf("-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
             }
         }
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            // 双 ABI: arm64-v8a (主力) + armeabi-v7a (老设备)
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
         }
     }
 
