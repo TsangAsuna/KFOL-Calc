@@ -31,12 +31,53 @@
             android:text="基础参数"
             android:textStyle="bold" />
 
-        <EditText
-            android:id="@+id/npcRatesInput"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="NPC出现率 (0-99, 四类之和<100, 剩余为普通怪)"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="NPC出现率 (强壮 坚强 快速 睿智, 默认 10 10 10 10)"
-            android:inputType="text" />
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/npcRateStrgInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:hint="强壮"
+                android:inputType="number" />
+
+            <EditText
+                android:id="@+id/npcRateToghInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:hint="坚强"
+                android:inputType="number" />
+
+            <EditText
+                android:id="@+id/npcRateFastInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:hint="快速"
+                android:inputType="number" />
+
+            <EditText
+                android:id="@+id/npcRateClvrInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="睿智"
+                android:inputType="number" />
+        </LinearLayout>
 
         <EditText
             android:id="@+id/coefInput"
@@ -219,7 +260,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="最佳加点 (自动计算填入)"
+            android:text="最佳加点 (可手动修改, 输入点数后自动计算覆盖)"
             android:textSize="12sp"
             android:textColor="#666666" />
 
@@ -228,75 +269,159 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
-            <LinearLayout
+            <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:text="力量"
+                android:textSize="14sp" />
 
-                <EditText
-                    android:id="@+id/attrStrInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="力量"
-                    android:inputType="number" />
+            <EditText
+                android:id="@+id/attrStrInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
 
-                <EditText
-                    android:id="@+id/attrVitInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="体质"
-                    android:inputType="number" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-                <EditText
-                    android:id="@+id/attrAgiInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="敏捷"
-                    android:inputType="number" />
-
-                <EditText
-                    android:id="@+id/attrDexInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="灵活"
-                    android:inputType="number" />
-            </LinearLayout>
-
-            <LinearLayout
+            <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:text="体质"
+                android:textSize="14sp" />
 
-                <EditText
-                    android:id="@+id/attrIntInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="智力"
-                    android:inputType="number" />
+            <EditText
+                android:id="@+id/attrVitInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
 
-                <EditText
-                    android:id="@+id/attrResInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="意志"
-                    android:inputType="number" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-                <EditText
-                    android:id="@+id/attrStaInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="耐力"
-                    android:inputType="number" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="敏捷"
+                android:textSize="14sp" />
 
-                <EditText
-                    android:id="@+id/attrLukInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="幸运"
-                    android:inputType="number" />
-            </LinearLayout>
+            <EditText
+                android:id="@+id/attrAgiInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="灵活"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/attrDexInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="智力"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/attrIntInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="意志"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/attrResInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="耐力"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/attrStaInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="幸运"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/attrLukInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
         </LinearLayout>
 
         <!-- 计算模式 -->
@@ -392,7 +517,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="top"
-            android:hint="Cloth #90442450&#10;1 IMT&#10;4 AMR RFL CRD SLD&#10;8 HEL COF 5 HEL COF 2 SRD COF 5 SLD VIT 5 SRD COF 3 SLD DEX 5 AMR RES 3 HEL COF 2&#10;&#10;Sword #89545072&#10;1 AMT&#10;4 BRC CRT LCH SKL&#10;8 CRT INT 3 BRC AGI 3 BRC COF 4 BRC AGI 5 LCH COF 2 ATK STR 2 SPD AGI 2 BRC INT 5"
+            android:hint="【例如：】&#10;Cloth #90442450&#10;1 IMT&#10;4 AMR RFL CRD SLD&#10;8 HEL COF 5 HEL COF 2 SRD COF 5 SLD VIT 5 SRD COF 3 SLD DEX 5 AMR RES 3 HEL COF 2&#10;&#10;Sword #89545072&#10;1 AMT&#10;4 BRC CRT LCH SKL&#10;8 CRT INT 3 BRC AGI 3 BRC COF 4 BRC AGI 5 LCH COF 2 ATK STR 2 SPD AGI 2 BRC INT 5"
             android:inputType="textMultiLine"
             android:minLines="6"
             android:maxLines="12"

@@ -9,7 +9,10 @@ import kotlinx.coroutines.*
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var npcRatesInput: EditText
+    private lateinit var npcRateStrgInput: EditText
+    private lateinit var npcRateToghInput: EditText
+    private lateinit var npcRateFastInput: EditText
+    private lateinit var npcRateClvrInput: EditText
     private lateinit var coefInput: EditText
     private lateinit var auraInput: EditText
     private lateinit var hpHealInput: EditText
@@ -54,7 +57,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        npcRatesInput = findViewById(R.id.npcRatesInput)
+        npcRateStrgInput = findViewById(R.id.npcRateStrgInput)
+        npcRateToghInput = findViewById(R.id.npcRateToghInput)
+        npcRateFastInput = findViewById(R.id.npcRateFastInput)
+        npcRateClvrInput = findViewById(R.id.npcRateClvrInput)
         coefInput = findViewById(R.id.coefInput)
         auraInput = findViewById(R.id.auraInput)
         hpHealInput = findViewById(R.id.hpHealInput)
@@ -92,12 +98,24 @@ class MainActivity : AppCompatActivity() {
         searchBtn = findViewById(R.id.searchBtn)
 
         // 默认值 (与 kfol.in 推荐一致)
-        npcRatesInput.setText("10 10 10 10")
+        npcRateStrgInput.setText("10")
+        npcRateToghInput.setText("10")
+        npcRateFastInput.setText("10")
+        npcRateClvrInput.setText("10")
         coefInput.setText("11")
         auraInput.setText("501")
         hpHealInput.setText("8")
         hpStepInput.setText("100")
         pointsInput.setText("500")
+        // 最佳加点 8 维默认值 (允许用户修改, 计算后自动覆盖)
+        attrStrInput.setText("1")
+        attrVitInput.setText("1")
+        attrAgiInput.setText("1")
+        attrDexInput.setText("1")
+        attrIntInput.setText("1")
+        attrResInput.setText("1")
+        attrStaInput.setText("0")
+        attrLukInput.setText("0")
         maxLvlInput.setText("239")
         startLvlInput.setText("1")
         wpnLvlInput.setText("12")
@@ -109,6 +127,16 @@ class MainActivity : AppCompatActivity() {
         itemLolInput.setText("0")
         itemYaoInput.setText("0")
         itemZheInput.setText("0")
+
+        // 药/券上限 10: 输入超上限自动回写
+        itemYaoInput.filters = arrayOf(android.text.InputFilter { src, _, _, _, _, _ ->
+            val s = src.toString()
+            if (s.isNotEmpty() && (s.toIntOrNull() ?: 0) > 10) "" else s
+        })
+        itemZheInput.filters = arrayOf(android.text.InputFilter { src, _, _, _, _, _ ->
+            val s = src.toString()
+            if (s.isNotEmpty() && (s.toIntOrNull() ?: 0) > 10) "" else s
+        })
 
         // 高级选项默认值: readme 推荐配置
         optInput.setText(
@@ -166,8 +194,13 @@ class MainActivity : AppCompatActivity() {
 
     /** 防抖: 点数输入停止 400ms 后触发 native 搜索, 自动填 8 维 */
     private fun applyBaseParams() {
-        val rates = npcRatesInput.text.toString().split(Regex("\\s+"))
-            .mapNotNull { it.toIntOrNull() }.toIntArray()
+        // 4 个出现率: 强壮/坚强/快速/睿智 (剩余为普通)
+        val rates = intArrayOf(
+            npcRateStrgInput.text.toString().toIntOrNull() ?: 10,
+            npcRateToghInput.text.toString().toIntOrNull() ?: 10,
+            npcRateFastInput.text.toString().toIntOrNull() ?: 10,
+            npcRateClvrInput.text.toString().toIntOrNull() ?: 10
+        )
         val coef = coefInput.text.toString().toIntOrNull() ?: 11
         val aura = auraInput.text.toString().toIntOrNull() ?: 501
         val hpHeal = hpHealInput.text.toString().toIntOrNull() ?: 8
@@ -206,14 +239,19 @@ class MainActivity : AppCompatActivity() {
         attrLukInput.setText((rest - rest / 2).toString())
     }
 
-    private fun readItems(): IntArray = intArrayOf(
-        itemRemInput.text.toString().toIntOrNull() ?: 0,
-        itemIzaInput.text.toString().toIntOrNull() ?: 0,
-        itemKeyInput.text.toString().toIntOrNull() ?: 0,
-        itemLolInput.text.toString().toIntOrNull() ?: 0,
-        itemYaoInput.text.toString().toIntOrNull() ?: 0,
-        itemZheInput.text.toString().toIntOrNull() ?: 0
-    )
+    private fun readItems(): IntArray {
+        // 药/券上限 10 (满10即最高效果)
+        val yao = (itemYaoInput.text.toString().toIntOrNull() ?: 0).coerceAtMost(10)
+        val zhe = (itemZheInput.text.toString().toIntOrNull() ?: 0).coerceAtMost(10)
+        return intArrayOf(
+            itemRemInput.text.toString().toIntOrNull() ?: 0,
+            itemIzaInput.text.toString().toIntOrNull() ?: 0,
+            itemKeyInput.text.toString().toIntOrNull() ?: 0,
+            itemLolInput.text.toString().toIntOrNull() ?: 0,
+            yao,
+            zhe
+        )
+    }
 
     private fun pasteFromClipboard(target: EditText, msg: (Int) -> String) {
         val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -266,7 +304,7 @@ class MainActivity : AppCompatActivity() {
             sb.append("\n最优通过层数: ${res.bestLvl}\n")
             sb.append("加点总点数: $effPoints (含道具加成 $itemPointsBonus)\n")
             sb.append("道具: 漫画${items[0]}/${items[1]} 钥匙${items[2]} CD${items[3]} 药${items[4]} 券${items[5]}\n")
-            sb.append("NPC出现率: ${npcRatesInput.text}\n")
+            sb.append("NPC出现率: 强壮${npcRateStrgInput.text} 坚强${npcRateToghInput.text} 快速${npcRateFastInput.text} 睿智${npcRateClvrInput.text}\n")
             sb.append("神秘系数: ${coefInput.text} 光环: $aura\n")
             sb.append("HP回复: ${hpHealInput.text} HPstep: ${hpStepInput.text}\n")
             sb.append("耗时: ${res.elapsedMs} ms\n")
