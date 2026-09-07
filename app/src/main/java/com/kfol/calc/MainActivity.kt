@@ -18,14 +18,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var hpHealInput: EditText
     private lateinit var hpStepInput: EditText
     private lateinit var pointsInput: EditText
-    private lateinit var attrStrInput: EditText
-    private lateinit var attrVitInput: EditText
-    private lateinit var attrAgiInput: EditText
-    private lateinit var attrDexInput: EditText
-    private lateinit var attrIntInput: EditText
-    private lateinit var attrResInput: EditText
-    private lateinit var attrStaInput: EditText
-    private lateinit var attrLukInput: EditText
+    private lateinit var attrStrInput: TextView
+    private lateinit var attrVitInput: TextView
+    private lateinit var attrAgiInput: TextView
+    private lateinit var attrDexInput: TextView
+    private lateinit var attrIntInput: TextView
+    private lateinit var attrResInput: TextView
+    private lateinit var attrStaInput: TextView
+    private lateinit var attrLukInput: TextView
+    private lateinit var keyLevelsInput: EditText
     private lateinit var itemRemInput: EditText
     private lateinit var itemIzaInput: EditText
     private lateinit var itemKeyInput: EditText
@@ -76,6 +77,7 @@ class MainActivity : AppCompatActivity() {
         attrResInput = findViewById(R.id.attrResInput)
         attrStaInput = findViewById(R.id.attrStaInput)
         attrLukInput = findViewById(R.id.attrLukInput)
+        keyLevelsInput = findViewById(R.id.keyLevelsInput)
         itemRemInput = findViewById(R.id.itemRemInput)
         itemIzaInput = findViewById(R.id.itemIzaInput)
         itemKeyInput = findViewById(R.id.itemKeyInput)
@@ -120,6 +122,7 @@ class MainActivity : AppCompatActivity() {
         attrResInput.setText("1")
         attrStaInput.setText("0")
         attrLukInput.setText("0")
+        keyLevelsInput.setText("1,51,101,151,201")
         maxLvlInput.setText("239")
         startLvlInput.setText("1")
         wpnLvlInput.setText("12")
@@ -323,10 +326,8 @@ class MainActivity : AppCompatActivity() {
         val aura = auraInput.text.toString().toIntOrNull() ?: 501
         val items = readItems()
 
-        // 道具点数加成
-        val itemPointsBonus =
-            (if (items[2] >= 30) 30 else 0) + (if (items[4] >= 10) 120 else 0)
-        val effPoints = points + itemPointsBonus
+        // 道具加成由 C++ 内部处理 (钥匙/药加点是原版 attrPoints 的一部分)
+        val effPoints = points
 
         if (points < 6 || maxLvl < 1) { toast("参数不合法"); return }
 
@@ -352,8 +353,8 @@ class MainActivity : AppCompatActivity() {
             attr8[6] = rest / 2
             attr8[7] = rest - rest / 2
             attr8.forEachIndexed { i, v -> sb.append("${names[i]}: $v\n") }
-            sb.append("\n最优通过层数: ${res.bestLvl}\n")
-            sb.append("加点总点数: $effPoints (含道具加成 $itemPointsBonus)\n")
+            sb.append("最优通过层数: ${res.bestLvl}\n")
+                        sb.append("加点总点数: $points\n")
             sb.append("道具: 漫画${items[0]}/${items[1]} 钥匙${items[2]} CD${items[3]} 药${items[4]} 券${items[5]}\n")
             sb.append("NPC出现率: 强壮${npcRateStrgInput.text} 坚强${npcRateToghInput.text} 快速${npcRateFastInput.text} 睿智${npcRateClvrInput.text}\n")
             sb.append("神秘系数: ${coefInput.text} 光环: $aura\n")

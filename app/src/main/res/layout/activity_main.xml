@@ -351,7 +351,22 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="最佳加点 (可手动修改, 输入点数后自动计算覆盖)"
+            android:text="关键层 (每层可重新加点, 逗号分隔, 如 1,51,101,151,201)"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+
+        <EditText
+            android:id="@+id/keyLevelsInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="关键层 (逗号分隔)"
+            android:inputType="text" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="最佳加点 (只读, 计算后自动输出)"
             android:textSize="12sp"
             android:textColor="#666666" />
 
@@ -368,11 +383,12 @@
                 android:text="力量"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrStrInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -388,11 +404,12 @@
                 android:text="体质"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrVitInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -408,11 +425,12 @@
                 android:text="敏捷"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrAgiInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -428,11 +446,12 @@
                 android:text="灵活"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrDexInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -448,11 +467,12 @@
                 android:text="智力"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrIntInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -468,11 +488,12 @@
                 android:text="意志"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrResInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -488,11 +509,12 @@
                 android:text="耐力"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrStaInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <LinearLayout
@@ -508,11 +530,12 @@
                 android:text="幸运"
                 android:textSize="14sp" />
 
-            <EditText
+            <TextView
                 android:id="@+id/attrLukInput"
                 android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:inputType="number" />
+                android:focusable="false"
+                android:textSize="16sp" />
         </LinearLayout>
 
         <!-- 计算模式 -->

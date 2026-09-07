@@ -12,6 +12,9 @@ MAX_ROUND = 200
 g_items = [0] * 6
 g_aura = 501
 g_coef = 11
+# 敌人出现率 (原版: 强壮 坚强 快速 睿智 各10, 普通=剩余60, BOSS=100)
+ENEMY_RATES = [60, 10, 10, 10, 10, 100]
+MIN_WIN_RATE = 100  # 万分率 0-10000 (用户默认 MINWINRATE 100 = 1%胜率要求, 原版同语义)
 
 ENEMY_NUM_NAMES = ["NORM", "STRG", "TOGH", "FAST", "CLVR", "BOSS"]
 
@@ -98,53 +101,120 @@ def def_v(pres):
     d = (pres * 20001 + 150) // (pres * 2 + 300)
     return min(d, 9900)
 
-def battle(ps, es):
-    php, ehp = ps[11], es[11]
-    rounds = 0
-    while ehp > 0 and rounds < MAX_ROUND:
-        rounds += 1
-        pdef = def_v(ps[6])
-        tec = min(ps[4], 99)
-        crt = min(ps[3], 99)
-        p0 = (100 - tec) * (100 - crt)
-        p1 = tec * (100 - crt)
-        p2 = (100 - tec) * crt
-        p3 = tec * crt
-        dmg = (ps[0] * 100 * p0 +
-               (ps[0] * 100 + ps[5] * 100) * p1 +
-               ps[0] * ps[8] * p2 +
-               (ps[0] * ps[8] + ps[5] * 100) * p3) // 10000
-        edef = def_v(es[6])
-        dmg = dmg * (10000 - edef) // 10000 + ps[10]
-        if dmg < 1:
-            dmg = 1
-        ehp -= dmg
-        if ehp <= 0:
-            break
-        etec = min(es[4], 99)
-        ecrt = min(es[3], 99)
-        edmg = es[0] * 100 * ((100 - etec) * (100 - ecrt) + (100 - etec) * ecrt * 2) // 10000
-        edmg = edmg * (10000 - pdef) // 10000
-        if edmg < 1:
-            edmg = 1
-        php -= edmg
-        if php <= 0:
-            return php
-    return php if ehp <= 0 else 0
+def rand100(state):
+    M = 48271
+    Q = 0x7FFFFFFF // M
+    R = 0x7FFFFFFF % M
+    state[0] = M * (state[0] % Q) - R * (state[0] // Q)
+    if state[0] < 0:
+        state[0] += 0x7FFFFFFF
+    return state[0] % 100
 
-def climb(start, maxlvl, attr, wpn, amr):
+def battle_one(state, ps, es, lvl):
+    php, ehp = ps[11], es[11]
+    pspd, espd = ps[2], es[2]
+    patk, eatk = ps[0], es[0]
+    psld = 0
+    maxround = MAX_ROUND
+    round, ptm, etm = 0, 0, 0
+    while True:
+        pspd2 = pspd
+        if ptm < pspd2 and etm < espd:
+            inc = min(pspd2 - ptm, espd - etm)
+            ptm += inc; etm += inc
+        if etm >= espd:  # 玩家回合
+            etm = 0
+            tec = min(ps[4], 99); crt = min(ps[3], 99)
+            istec = rand100(state) < tec
+            iscrt = rand100(state) < crt
+            dmg0 = patk * ps[8] if iscrt else patk * 100
+            if istec:
+                dmg0 = dmg0 + ps[5] * 100
+                dmg0 = dmg0 * ps[9] // 10000 * 100
+            edef = def_v(es[6])
+            dmg = (dmg0 * (10000 - edef) + 999999) // 1000000 + ps[10]
+            ehp -= dmg
+            php += ps[10]
+            if php > ps[1]:
+                php = ps[1]
+        else:  # 敌人回合
+            ptm = 0
+            istec = rand100(state) < es[4]
+            iscrt = rand100(state) < es[3]
+            dmg = (0 if istec else eatk * (2 if iscrt else 1)) + (es[5] if istec else 0)
+            if es[3] == 0 and iscrt:
+                dmg = 0
+            if es[10] == 3 and lvl > 100 and iscrt:
+                dmg *= 3
+            if psld >= dmg:
+                psld -= dmg; dmg = 1
+            else:
+                dmg -= psld; psld = 0
+            pdef = def_v(ps[6])
+            dmg = (dmg * (10000 - pdef) + 9999) // 10000
+            php -= dmg
+            if istec:
+                if es[10] == 2:  # TOGH
+                    ehp += es[1] // 10
+                elif es[10] == 0:  # NORM
+                    eatk += eatk // 4
+                elif es[10] == 3:  # FAST
+                    newspd = espd + espd // 2
+                    espd = min(newspd, 100000000)
+                    etm += newspd - espd
+            if php > ps[1]:
+                php = ps[1]
+            if ehp > es[1]:
+                ehp = es[1]
+            if es[10] == 3 and lvl > 100 and rand100(state) < 30:
+                newspd = espd * 3 // 10
+                espd = min(newspd, 100000000)
+                etm += newspd - espd
+        round += 1
+        if ehp < 1:
+            return 1
+        if php < 1:
+            return 0
+        if round >= maxround:
+            return 1 if ehp < php else 0
+        if round >= 20:
+            eatk = min(eatk * 2, 30000000)
+            newspd = espd * 2
+            espd = min(newspd, 100000000)
+            etm += newspd - espd
+
+def battle(ps, es, lvl, sims=100):
+    state = [(ps[0] * 2654435761 ^ es[0] * 40503 ^ ps[1] * 13 ^ lvl * 97) & 0x7FFFFFFF]
+    if state[0] == 0:
+        state[0] = 1
+    wins = 0
+    for _ in range(sims):
+        state[0] = (state[0] * 1103515245 + 12345) & 0x7FFFFFFF
+        wins += battle_one(state, ps, es, lvl)
+    return wins * 10000 // sims
+
+def climb(start, maxlvl, attr, wpn, amr, sims=100):
     ps = calc_player(attr, wpn, amr)
     lvl = start
     while lvl <= maxlvl:
-        worst = -1
-        for e in range(ENEMY_NUM):
+        emin = 5 if lvl % 10 == 0 else 0
+        emax = 5 if lvl % 10 == 0 else 4
+        wsum = wwin = 0
+        for e in range(emin, emax + 1):
+            rate = ENEMY_RATES[e]
+            if rate <= 0:
+                continue
             es = calc_enemy(lvl, e)
-            remain = battle(ps, es)
-            if remain > worst:
-                worst = remain
-        if worst <= 0:
+            winrate = battle(ps, es, lvl, sims)
+            wsum += rate
+            wwin += winrate * rate
+        if wsum <= 0:
             break
-        ps[11] = worst
+        avg = wwin // wsum
+        if avg < MIN_WIN_RATE:
+            break
+        hp = ps[1] * avg // 10000 + 100
+        ps[11] = min(hp, ps[1])
         lvl += 1
     return lvl - 1
 
@@ -176,7 +246,7 @@ def init_attr(pattern, points):
                 inc_w = False
     return a
 
-def search(points, start, maxlvl, wpn, amr, aura, items):
+def search(points, start, maxlvl, wpn, amr, aura, items, sims=100):
     global g_aura, g_items
     g_aura = aura
     g_items = list(items)
@@ -184,7 +254,7 @@ def search(points, start, maxlvl, wpn, amr, aura, items):
     best_attr = None
     for pattern in range(8):
         attr = init_attr(pattern, points)
-        cur = climb(start, maxlvl, attr, wpn, amr)
+        cur = climb(start, maxlvl, attr, wpn, amr, sims)
         if cur > best_lvl:
             best_lvl = cur
             best_attr = list(attr)
@@ -204,7 +274,7 @@ def search(points, start, maxlvl, wpn, amr, aura, items):
                         if j == i:
                             continue
                         attr[j] += step
-                        l = climb(start, maxlvl, attr, wpn, amr)
+                        l = climb(start, maxlvl, attr, wpn, amr, sims)
                         if l > best_delta:
                             best_delta = l
                             bi, bj = i, j
@@ -242,23 +312,23 @@ if __name__ == '__main__':
         es = calc_enemy(50, e)
         t(es[0] > 0 and es[11] > 0, f'层50 {ENEMY_NUM_NAMES[e]}: ATK={es[0]} LFE={es[1]} HP={es[11]}')
 
-    print('--- 单元: 战斗 ---')
-    winner = battle(calc_player([1000]*6, 100, 100), calc_enemy(10, 0))
-    t(winner > 0, f'超人打层10 NORM: 胜 (剩{winner}HP)')
-    loser = battle(calc_player([1,1,1,1,1,1], 1, 1), calc_enemy(200, 5))
-    t(loser <= 0, f'菜鸟打层200 BOSS: 败 ({loser})')
+    print('--- 单元: 战斗 (胜率万分率) ---')
+    winner = battle(calc_player([1000]*6, 100, 100), calc_enemy(10, 0), 10)
+    t(winner > 5000, f'超人打层10 NORM: 胜率 {winner}/10000')
+    loser = battle(calc_player([1,1,1,1,1,1], 1, 1), calc_enemy(200, 5), 200)
+    t(loser <= 5000, f'菜鸟打层200 BOSS: 胜率 {loser}/10000 (低)')
 
-    print('--- 单元: 爬塔 ---')
-    lvl_weak = climb(1, 239, [10]*6, 1, 1)
-    lvl_strong = climb(1, 239, [1000]*6, 100, 100)
+    print('--- 单元: 爬塔 (小样本10, 限100层) ---')
+    lvl_weak = climb(1, 100, [10]*6, 1, 1, sims=10)
+    lvl_strong = climb(1, 100, [1000]*6, 100, 100, sims=10)
     t(lvl_strong >= lvl_weak, f'强属性爬更高: weak={lvl_weak} strong={lvl_strong}')
 
-    print('--- 搜索 ---')
-    lvl500, attr500 = search(500, 1, 239, 12, 6, 501, [0]*6)
+    print('--- 搜索 (小样本10, 限100层) ---')
+    lvl500, attr500 = search(500, 1, 100, 12, 6, 501, [0]*6, sims=10)
     t(attr500 is not None and sum(attr500) == 500, f'搜索500点: 层{lvl500} 加点守恒={sum(attr500) if attr500 else None}')
-    lvl2000, _ = search(2000, 1, 239, 12, 6, 501, [0]*6)
+    lvl2000, _ = search(2000, 1, 100, 12, 6, 501, [0]*6, sims=10)
     t(lvl2000 >= lvl500, f'2000点({lvl2000}) >= 500点({lvl500})')
-    lvl_strong_equip, _ = search(500, 1, 239, 40, 40, 501, [0]*6)
+    lvl_strong_equip, _ = search(500, 1, 100, 40, 40, 501, [0]*6, sims=10)
     t(lvl_strong_equip >= lvl500, f'强装备({lvl_strong_equip}) >= 默认装备({lvl500})')
 
     print('\n' + ('ALL KFOL CORE TESTS PASSED' if ok else 'SOME TESTS FAILED'))
