@@ -381,6 +381,7 @@ static double kfolBattleCache[KFOL_BUCKET_MAX][6];   // [桶][敌人类型] 的�
 static bool kfolBattleCached[6];                     // 每敌人类型是否已缓存 (独立标志, 避免桶0歧义)
 static int kfolBattleCachedWin[6];                   // 每敌人类型缓存的胜率 (万分率)
 static int kfolBattleCacheLvl = -1;                   // 当前缓存所属层
+static int kfolBattleCacheHp = -1;                    // 当前缓存所属 HP (分布递归依赖初始HP)
 static int kfolBucketSize = 100;
 // 递归用静态分布缓冲 (避免 100 层递归 × 16KB 栈数组 = 栈溢出闪退; 搜索单线程所以安全)
 // OpenMP 并行后: 每线程一份 (threadprivate)
@@ -388,7 +389,7 @@ static double kfolTmpHist[KFOL_BUCKET_MAX];
 static double kfolHpHist[KFOL_BUCKET_MAX];
 // OpenMP threadprivate: 工作线程副本不继承 static 零初始化 (垃圾值!), 用哨兵检测首次进入
 static int kfolThreadInit = 0;
-#pragma omp threadprivate(kfolTmpHist, kfolHpHist, kfolBattleCache, kfolBattleCached, kfolBattleCachedWin, kfolBattleCacheLvl, kfolBucketSize, kfolThreadInit)
+#pragma omp threadprivate(kfolTmpHist, kfolHpHist, kfolBattleCache, kfolBattleCached, kfolBattleCachedWin, kfolBattleCacheLvl, kfolBattleCacheHp, kfolBucketSize, kfolThreadInit)
 
 // 每线程首次进入时初始化 (OpenMP 副本零初始化只对主线程)
 static inline void kfolEnsureThreadInit()
@@ -425,15 +426,23 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
     // 本层敌人加权: 普通层 NORM..CLVR, 10的倍数层 BOSS
     int eMin = lvl % 10 == 0 ? BOSS : NORM;
     int eMax = lvl % 10 == 0 ? BOSS : CLVR;
+    // 桶步长: BATTLESTEP 用户可设, 但保底让桶数 <= 128 (避免分布被桶数打碎)
     int step = gOptBattleStep > 0 ? gOptBattleStep : 100;
-    kfolBucketSize = step;
+    if (step < 1) step = 1;
     int histSize = pStat[LFE] / step + 2;
+    while (histSize > KFOL_BUCKET_MAX / 16 && step < pStat[LFE])
+    {
+        step *= 2;
+        histSize = pStat[LFE] / step + 2;
+    }
     if (histSize > KFOL_BUCKET_MAX) histSize = KFOL_BUCKET_MAX;
+    kfolBucketSize = step;
 
-    // 本层战斗结果缓存: 若缓存层改变则全清
-    if (kfolBattleCacheLvl != lvl)
+    // 本层战斗结果缓存: 层或HP改变则全清 (分布递归的每个HP分支独立战斗)
+    if (kfolBattleCacheLvl != lvl || kfolBattleCacheHp != hp)
     {
         kfolBattleCacheLvl = lvl;
+        kfolBattleCacheHp = hp;
         for (int e = 0; e < 6; ++e) kfolBattleCached[e] = false;
     }
 
@@ -441,6 +450,12 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
     double* hpHist = kfolHpHist;
     for (int i = 0; i < histSize; ++i) hpHist[i] = 0;
     int64_t rateSum = 0, winSum = 0;
+
+    // 分布递归: 战斗从当前剩余HP开始 (原版 calcAttrForward 语义)
+    int pStatLocal[STAT_NUM];
+    for (int i = 0; i < STAT_NUM; ++i) pStatLocal[i] = pStat[i];
+    pStatLocal[HP] = hp < 1 ? 1 : hp;
+    const int* pStatForBattle = pStatLocal;
 
     for (int e = eMin; e <= eMax; ++e)
     {
@@ -451,7 +466,7 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
         {
             int eStat[STAT_NUM];
             kfolCalcEnemyStats(lvl, e, eStat);
-            int winRate = kfolBattle(pStat, eStat, lvl, kfolTmpHist, histSize, step);
+            int winRate = kfolBattle(pStatForBattle, eStat, lvl, kfolTmpHist, histSize, step);
             for (int i = 0; i < histSize; ++i) kfolBattleCache[i][e] = kfolTmpHist[i];
             kfolBattleCachedWin[e] = winRate;
             kfolBattleCached[e] = true;
@@ -468,15 +483,18 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
     int64_t winRate = winSum / rateSum;
     if (winRate < gOptMinWinRate) return lvl - 1;  // 打不过本层
 
-    // 稀疏化递归: 只对概率 >= 1% 的剩余HP桶继续 (原版 imod 采样近似)
+    // 分布递归: 原版 imod 二分采样 (间隔覆盖全分布, 不丢概率)
     double total = 0;
-    for (int i = 0; i < histSize; ++i)
-    {
-        if (hpHist[i] < 0.01) continue;  // <1% 忽略
-        int nextHp = i * step;
-        if (nextHp < 1) continue;
-        total += kfolEvalForward(lvl + 1, nextHp, pStat, maxLvl) * hpHist[i];
-    }
+    int imod = 1;
+    while (imod * 2 <= histSize) imod *= 2;
+    for (; imod; imod /= 2)
+        for (int i = imod - 1; i < histSize; i += imod * 2)
+        {
+            if (hpHist[i] <= 0) continue;
+            int nextHp = i * step;
+            if (nextHp < 1) continue;
+            total += kfolEvalForward(lvl + 1, nextHp, pStat, maxLvl) * hpHist[i];
+        }
     return total;
 }
 
