@@ -297,6 +297,8 @@ class MainActivity : AppCompatActivity() {
                     maxLvl, wpnLvl, amrLvl, aura, items)
             }
             val names = arrayOf("力量", "体质", "敏捷", "灵活", "智力", "意志", "耐力", "幸运")
+            // 计算结果自动回填到加点输入框
+            fillAttrFields(res.attr, effPoints)
             val sb = StringBuilder()
             val attr8 = IntArray(8)
             System.arraycopy(res.attr, 0, attr8, 0, 6)
