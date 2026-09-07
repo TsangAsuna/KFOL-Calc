@@ -30,7 +30,7 @@ static int gOptGridMaxCenter = 10;      // GRIDOPTION 第3项
 
 // ---- 属性/stat 索引 (原版枚举) ----
 enum { STR=0, VIT=1, AGI=2, DEX=3, INT=4, RES=5 };
-enum { ATK=0, LFE=1, SPD=2, CRT=3, TEC=4, MAG=5, PRES=6, DEF=6, ACR=8, ASR=9, LCH=10, HP=11 };
+enum { ATK=0, LFE=1, SPD=2, CRT=3, TEC=4, MAG=5, PRES=6, DEF=6, ACR=8, ASR=9, LCH=10, SKL=10, HP=11 };
 enum { NORM=0, STRG=1, TOGH=2, FAST=3, CLVR=4, BOSS=5, CLVR3=6 };
 
 extern "C" {
@@ -207,6 +207,7 @@ void kfolCalcEnemyStats(int lvl, int type, int* out)
     out[PRES] = base[RES];
     out[ACR] = 200;
     out[ASR] = 100;
+    out[SKL] = type;  // 敌人类型 (原版 SKL=10 与 LCH 同槽; 敌人无吸血所以可复用)
     // FASTSKILL: 快速怪技能 (原版 1=禁TEC 2=强行TEC 3=半TEC 4=狂暴TEC)
     if (type == FAST && gOptFastSkill > 0)
     {
