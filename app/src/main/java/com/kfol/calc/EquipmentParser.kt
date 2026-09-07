@@ -10,14 +10,14 @@ package com.kfol.calc
  */
 object EquipmentParser {
 
-    // 8 种装备类型: 前 4 武器, 后 4 防具
+    // 7 种装备类型: 前 4 武器, 后 3 防具 (原版无 Body, 防具只有 皮甲/铠甲/布甲)
     val WEAPON_TYPES = listOf("Fist", "Sword", "Bow", "Staff")
-    val ARMOR_TYPES = listOf("Body", "Plate", "Leather", "Cloth")
+    val ARMOR_TYPES = listOf("Plate", "Leather", "Cloth")
 
     // 中文映射
     val TYPE_CN = mapOf(
         "Fist" to "拳套", "Sword" to "长剑", "Bow" to "短弓", "Staff" to "法杖",
-        "Body" to "布衣", "Plate" to "铁甲", "Leather" to "皮甲", "Cloth" to "布甲"
+        "Plate" to "铠甲", "Leather" to "皮甲", "Cloth" to "布甲"
     )
     // 神秘属性: 武器 FMT/LMT/AMT, 防具 IMT/TMT/HMT
     val MYSTIC_CN = mapOf(

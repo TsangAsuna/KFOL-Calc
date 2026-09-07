@@ -641,7 +641,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="类型: Fist/Sword/Bow/Staff(武器) · Body/Plate/Leather/Cloth(防具)"
+            android:text="类型: Fist/Sword/Bow/Staff(武器) · Plate(铠甲)/Leather(皮甲)/Cloth(布甲)"
             android:textSize="11sp"
             android:textColor="#666666" />
 

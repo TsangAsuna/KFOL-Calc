@@ -182,7 +182,7 @@ class MainActivity : AppCompatActivity() {
             if (raw.isEmpty()) { toast("先粘贴装备文本"); return@setOnClickListener }
             val info = EquipmentParser.parse(raw)
             if (info == null) {
-                equipInfoView.text = "解析失败: 无法识别装备类型 (Fist/Sword/Bow/Staff/Body/Plate/Leather/Cloth)"
+                equipInfoView.text = "解析失败: 无法识别装备类型 (Fist/Sword/Bow/Staff/Plate/Leather/Cloth)"
                 return@setOnClickListener
             }
             equipInfoView.text = EquipmentParser.summarize(info)
@@ -207,7 +207,7 @@ class MainActivity : AppCompatActivity() {
                     "4. 回到本App, 粘贴到上方输入框\n" +
                     "5. 点「解析装备并加入计算」\n\n" +
                     "支持武器: Fist/Sword/Bow/Staff\n" +
-                    "支持防具: Body/Plate/Leather/Cloth\n" +
+                    "支持防具: Plate(铠甲)/Leather(皮甲)/Cloth(布甲)\n" +
                     "可同时贴多件装备, 每行一件。"
                 )
                 .setPositiveButton("知道了", null)
