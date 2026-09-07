@@ -42,6 +42,9 @@ static JavaVM* gJvm = NULL;
 static jclass gProgressCls = NULL;
 static jmethodID gOnProgress = NULL;
 
+// 前向声明: native 工作线程回调 (定义在下方)
+static void kfolBridgeProgress(const char* msg);
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_kfol_calc_NativeCore_setProgressListener(JNIEnv* env, jobject, jobject)
 {
