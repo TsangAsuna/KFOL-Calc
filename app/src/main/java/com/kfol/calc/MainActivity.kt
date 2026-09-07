@@ -41,9 +41,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var neckLvlInput: EditText
     private lateinit var equipInput: EditText
     private lateinit var equipInfoView: TextView
+    private lateinit var equipHelpBtn: Button
     private lateinit var pasteBtn: Button
     private lateinit var parseEquipBtn: Button
     private lateinit var optInput: EditText
+    private lateinit var optHelpBtn: Button
     private lateinit var pasteOptBtn: Button
     private lateinit var resultView: TextView
     private lateinit var statusView: TextView
@@ -89,9 +91,11 @@ class MainActivity : AppCompatActivity() {
         neckLvlInput = findViewById(R.id.neckLvlInput)
         equipInput = findViewById(R.id.equipInput)
         equipInfoView = findViewById(R.id.equipInfoView)
+        equipHelpBtn = findViewById(R.id.equipHelpBtn)
         pasteBtn = findViewById(R.id.pasteBtn)
         parseEquipBtn = findViewById(R.id.parseEquipBtn)
         optInput = findViewById(R.id.optInput)
+        optHelpBtn = findViewById(R.id.optHelpBtn)
         pasteOptBtn = findViewById(R.id.pasteOptBtn)
         resultView = findViewById(R.id.resultView)
         statusView = findViewById(R.id.statusView)
@@ -193,6 +197,45 @@ class MainActivity : AppCompatActivity() {
             pasteFromClipboard(optInput) { "已粘贴高级选项 $it 字符" }
         }
 
+        // 装备粘贴帮助: 告诉用户去哪里复制
+        equipHelpBtn.setOnClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("装备粘贴说明")
+                .setMessage(
+                    "1. 打开 绯月 → 我的物品\n" +
+                    "2. 选中要计算的装备 (武器/防具)\n" +
+                    "3. 点击「复制装备参数」\n" +
+                    "4. 回到本App, 粘贴到上方输入框\n" +
+                    "5. 点「解析装备并加入计算」\n\n" +
+                    "支持武器: Fist/Sword/Bow/Staff\n" +
+                    "支持防具: Body/Plate/Leather/Cloth\n" +
+                    "可同时贴多件装备, 每行一件。"
+                )
+                .setPositiveButton("知道了", null)
+                .show()
+        }
+
+        // 高级选项帮助: 逐项说明
+        optHelpBtn.setOnClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setTitle("高级选项说明")
+                .setMessage(
+                    "MAXROUND N — 单场战斗最大回合数\n" +
+                    "FASTSKILL N — 快速怪技能 (0~4)\n" +
+                    "TOUGHSKILL N — 坚韧怪技能\n" +
+                    "MAXLEVEL N — 搜索最高层数\n" +
+                    "GRIDOPTION a b c — 搜索网格参数 (半径 步长 中心)\n" +
+                    "BATTLESTEP N — HP 离散步长 (越小越精细)\n" +
+                    "MINWINRATE N — 最低胜率要求 (0~100)\n" +
+                    "SERVERBONUS N — 服务器攻击加成 (0/1/2)\n" +
+                    "SIMULATIONMODE N — 蒙特卡洛样本数 (0=精确)\n" +
+                    "VERBOSE 0/1 — 详细日志\n\n" +
+                    "不填则使用默认值, 格式与绯月 kfol.in 一致。"
+                )
+                .setPositiveButton("知道了", null)
+                .show()
+        }
+
         searchBtn.setOnClickListener { startSearch() }
     }
 
@@ -210,6 +253,8 @@ class MainActivity : AppCompatActivity() {
         val hpHeal = hpHealInput.text.toString().toIntOrNull() ?: 8
         val hpStep = hpStepInput.text.toString().toIntOrNull() ?: 100
         NativeCore.setFullParams(rates, aura, coef, hpHeal, hpStep)
+        // 高级选项 (kfol.in 格式, C++ 侧解析生效)
+        NativeCore.setOptions(optInput.text.toString())
     }
 
     private fun scheduleAttrFill(points: Int) {

@@ -589,12 +589,31 @@
             android:inputType="number"
             android:text="0" />
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="装备粘贴 (绯月复制后一键粘贴)"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="装备粘贴 (绯月复制后一键粘贴)"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/equipHelpBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="36dp"
+                android:minHeight="36dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:text="?"
+                android:textSize="18sp" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"
@@ -642,12 +661,31 @@
             android:text="开始计算" />
 
         <!-- 高级选项 (LIMIT ~ MINWINRATE 一键粘贴) -->
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="高级选项 (LIMIT ~ MINWINRATE)"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="高级选项 (LIMIT ~ MINWINRATE)"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/optHelpBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="36dp"
+                android:minHeight="36dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:text="?"
+                android:textSize="18sp" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="wrap_content"

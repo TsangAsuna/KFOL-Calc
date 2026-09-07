@@ -25,6 +25,13 @@ object NativeCore {
     external fun setFullParams(npcRates: IntArray, aura: Int, coef: Int,
                                hpHeal: Int, hpStep: Int)
 
+    /**
+     * 设置高级选项 (kfol.in 格式原文, C++ 侧解析)
+     * MAXROUND/FASTSKILL/TOUGHSKILL/MAXLEVEL/GRIDOPTION/BATTLESTEP/
+     * MINWINRATE/SERVERBONUS/SIMULATIONMODE/VERBOSE
+     */
+    external fun setOptions(options: String)
+
     /** 探测 GPU 可用性: 1=可用 0=不可用 */
     external fun gpuAvailable(): Int
 

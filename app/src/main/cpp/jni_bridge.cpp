@@ -16,8 +16,9 @@ extern int kfolAura;
 extern int kfolCoef;
 int kfolGpuInit(void);
 int kfolGpuAvailable(void);
-void kfolCpuMcSimulate(const int*, const int*, const int*, const int*, const int*, int, int, float*, int*);
-void kfolCalcPlayerStats(const int*, int, int, int*);
+void kfolCpuMcSimulate(const int*, const int*, const int*, const int*, const int*,
+                       int, int, float*, int*);
+extern "C" void kfolSetOptions(const char* text);
 void kfolSearchAttrs(int, int, int, int, int, int, const int*, int*, int*);
 void kfolSetItems(const int*);
 void kfolSetHpParams(int, int);
@@ -46,24 +47,40 @@ Java_com_kfol_calc_NativeCore_setParams(JNIEnv* env, jobject, jintArray rates, j
     kfolCoef = coef;
 }
 
-// 设置完整基础参数: npcRates[4], aura, coef, hpHeal, hpStep
+// 设置完整基础参数: npcRates[4] = 强壮 坚强 快速 睿智, aura, coef, hpHeal, hpStep
 extern "C" JNIEXPORT void JNICALL
 Java_com_kfol_calc_NativeCore_setFullParams(JNIEnv* env, jobject,
     jintArray npcRates, jint aura, jint coef, jint hpHeal, jint hpStep)
 {
     vector<int> r;
     getIntArray(env, npcRates, r);
-    // 4 个出现率: 强壮 坚强 快速 睿智; 其余类型用默认 10
-    kfolEnemyRate[0] = r.size() > 0 ? r[0] : 10;  // NORM 普通
-    kfolEnemyRate[1] = r.size() > 1 ? r[1] : 10;  // STRG 强壮
-    kfolEnemyRate[2] = r.size() > 2 ? r[2] : 10;  // TOGH 坚强
-    kfolEnemyRate[3] = r.size() > 3 ? r[3] : 10;  // FAST 快速
-    kfolEnemyRate[4] = 10;  // CLVR 睿智
+    // UI 四框: 强壮(STRG) 坚强(TOGH) 快速(FAST) 睿智(CLVR)
+    kfolEnemyRate[1] = r.size() > 0 ? r[0] : 10;   // STRG 强壮
+    kfolEnemyRate[2] = r.size() > 1 ? r[1] : 10;   // TOGH 坚强
+    kfolEnemyRate[3] = r.size() > 2 ? r[2] : 10;   // FAST 快速
+    kfolEnemyRate[4] = r.size() > 3 ? r[3] : 10;   // CLVR 睿智
+    // NORM 普通 = 100 - 四类之和 (下限 0)
+    int norm = 100 - (kfolEnemyRate[1] + kfolEnemyRate[2] + kfolEnemyRate[3] + kfolEnemyRate[4]);
+    kfolEnemyRate[0] = norm > 0 ? norm : 0;
     kfolEnemyRate[5] = 10;  // BOSS (每10层固定)
     kfolAura = aura;
     kfolCoef = coef;
     extern void kfolSetHpParams(int, int);
     kfolSetHpParams(hpHeal, hpStep);
+}
+
+// 设置高级选项: kfol.in 格式原文, C++ 侧解析
+extern "C" JNIEXPORT void JNICALL
+Java_com_kfol_calc_NativeCore_setOptions(JNIEnv* env, jobject, jstring opts)
+{
+    if (!opts) { extern "C" void kfolSetOptions(const char*); kfolSetOptions(NULL); return; }
+    const char* str = env->GetStringUTFChars(opts, NULL);
+    if (str)
+    {
+        extern "C" void kfolSetOptions(const char*);
+        kfolSetOptions(str);
+        env->ReleaseStringUTFChars(opts, str);
+    }
 }
 
 // 探测 GPU: 返回 1 可用 / 0 不可用(回退CPU)

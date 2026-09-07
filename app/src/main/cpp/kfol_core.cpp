@@ -14,6 +14,20 @@ using namespace std;
 #define MAX_LVL 240
 #define MAX_ROUND 200
 
+// ---- 高级选项 (原版 kfol.in 可选项, 默认值对齐 readme) ----
+static int gOptMaxRound = MAX_ROUND;    // MAXROUND: 单场战斗回合上限
+static int gOptFastSkill = 0;           // FASTSKILL: 快速怪技能 (0/1/2/3/4)
+static int gOptToughSkill = 0;          // TOUGHSKILL: 坚韧怪技能
+static int gOptMaxLvl = 239;            // MAXLEVEL: 目标最高层
+static int gOptBattleStep = 10;         // BATTLESTEP: HP 离散步长
+static int gOptMinWinRate = 100;        // MINWINRATE: 需要的胜率 (万分率)
+static int gOptServerBonus = 0;         // SERVERBONUS: 服务器攻击加成 (0/1/2)
+static int gOptSimulationMode = 0;      // SIMULATIONMODE: 蒙特卡洛样本数 (0=精确)
+static int gOptVerbose = 0;             // VERBOSE
+static int gOptGridSize = 8;            // GRIDOPTION 第1项
+static int gOptGridBaseStep = 4;        // GRIDOPTION 第2项
+static int gOptGridMaxCenter = 10;      // GRIDOPTION 第3项
+
 // ---- 属性/stat 索引 (原版枚举) ----
 enum { STR=0, VIT=1, AGI=2, DEX=3, INT=4, RES=5 };
 enum { ATK=0, LFE=1, SPD=2, CRT=3, TEC=4, MAG=5, PRES=6, DEF=6, ACR=8, ASR=9, LCH=10, HP=11 };
@@ -38,6 +52,59 @@ void kfolSetHpParams(int heal, int step)
     gHpHeal = heal > 0 ? heal : 8;
     gHpStep = step > 0 ? step : 100;
 }
+
+// 解析高级选项 (kfol.in 格式, 每行 "键 值" 或 "键 值1 值2 值3")
+void kfolSetOptions(const char* text)
+{
+    if (!text) return;
+    // 逐行解析
+    char buf[1024];
+    size_t pos = 0, len = strlen(text);
+    while (pos < len)
+    {
+        // 提取一行
+        size_t eol = pos;
+        while (eol < len && text[eol] != '\n') ++eol;
+        size_t linelen = eol - pos;
+        if (linelen >= sizeof(buf)) linelen = sizeof(buf) - 1;
+        memcpy(buf, text + pos, linelen);
+        buf[linelen] = '\0';
+        pos = eol + 1;
+        // 跳过空白
+        char* p = buf;
+        while (*p == ' ' || *p == '\t') ++p;
+        if (*p == '\0') continue;
+        // 读键
+        char key[64];
+        int n = 0;
+        while (*p != '\0' && *p != ' ' && *p != '\t' && n < 63) key[n++] = *p++;
+        key[n] = '\0';
+        while (*p == ' ' || *p == '\t') ++p;
+        if (strcmp(key, "MAXROUND") == 0 && *p) gOptMaxRound = atoi(p);
+        else if (strcmp(key, "FASTSKILL") == 0 && *p) gOptFastSkill = atoi(p);
+        else if (strcmp(key, "TOUGHSKILL") == 0 && *p) gOptToughSkill = atoi(p);
+        else if (strcmp(key, "MAXLEVEL") == 0 && *p) { gOptMaxLvl = atoi(p); if (gOptMaxLvl < 1) gOptMaxLvl = 239; }
+        else if (strcmp(key, "BATTLESTEP") == 0 && *p) { gOptBattleStep = atoi(p); if (gOptBattleStep < 1) gOptBattleStep = 1; }
+        else if (strcmp(key, "MINWINRATE") == 0 && *p) gOptMinWinRate = atoi(p);
+        else if (strcmp(key, "SERVERBONUS") == 0 && *p) gOptServerBonus = atoi(p);
+        else if (strcmp(key, "SIMULATIONMODE") == 0 && *p) gOptSimulationMode = atoi(p);
+        else if (strcmp(key, "VERBOSE") == 0 && *p) gOptVerbose = atoi(p);
+        else if (strcmp(key, "GRIDOPTION") == 0)
+        {
+            int a = 0, b = 0, c = 0;
+            int got = sscanf(p, "%d %d %d", &a, &b, &c);
+            if (got >= 1 && a > 0) gOptGridSize = a;
+            if (got >= 2 && b > 0) gOptGridBaseStep = b;
+            if (got >= 3 && c > 0) gOptGridMaxCenter = c;
+        }
+    }
+}
+
+int kfolGetServerBonus() { return gOptServerBonus; }
+int kfolGetMaxRound() { return gOptMaxRound; }
+int kfolGetMaxLvl() { return gOptMaxLvl; }
+int kfolGetFastSkill() { return gOptFastSkill; }
+int kfolGetToughSkill() { return gOptToughSkill; }
 
 // -------- 敌人基础属性 (原版 getEnemyBaseAttr: 7 段系数) --------
 static int kfolEnemyBase(int lvl, int attr)
@@ -101,7 +168,7 @@ void kfolCalcPlayerStats(const int* attr, int wpnLvl, int amrLvl, int* out)
     }
 
     // 4) 12 维 stat (原版公式, 武器默认拳套)
-    out[ATK] = pNew[STR] * 5 + wpnVal[0];                       // ATK = STR*5 + 装备ATK
+    out[ATK] = pNew[STR] * 5 + (gOptServerBonus == 1 ? pNew[STR] * 3 / 20 + 45 : gOptServerBonus == 2 ? pNew[STR] / 4 + 75 : 0) + wpnVal[0];  // ATK = STR*5 + 服务器加成 + 装备ATK
     out[LFE] = pNew[VIT] * 20;                                  // LFE = VIT*20 (拳套)
     out[SPD] = pNew[AGI] * 2 + wpnVal[1];                       // SPD = AGI*2 + 装备SPD
     out[CRT] = (pNew[DEX] * 201 + 100) / (pNew[DEX] * 2 + 200) + wpnVal[2];
@@ -140,6 +207,18 @@ void kfolCalcEnemyStats(int lvl, int type, int* out)
     out[PRES] = base[RES];
     out[ACR] = 200;
     out[ASR] = 100;
+    // FASTSKILL: 快速怪技能 (原版 1=禁TEC 2=强行TEC 3=半TEC 4=狂暴TEC)
+    if (type == FAST && gOptFastSkill > 0)
+    {
+        switch (gOptFastSkill)
+        {
+            case 1: out[TEC] = 0; break;
+            case 2: if (out[TEC] > 0) out[TEC] = 100; break;
+            case 3: out[TEC] = out[TEC] >= 50 ? 100 : 0; break;
+            case 4: break; // 4=狂暴靠攻速, 期望战斗不细分
+        }
+    }
+    if (type == TOGH && gOptToughSkill == 1 && out[TEC] > 0) out[TEC] = 100;
     out[HP] = out[LFE];
     // CD 道具: 每张降敌生命上限0.8%, 满30 追加降攻击10%
     if (gItems[3] > 0)
@@ -168,7 +247,8 @@ int kfolBattle(const int* pStat, const int* eStat)
     int pHp = pStat[HP];
     int eHp = eStat[HP];
     int rounds = 0;
-    while (eHp > 0 && rounds < MAX_ROUND)
+    int maxRound = gOptMaxRound > 0 ? gOptMaxRound : MAX_ROUND;
+    while (eHp > 0 && rounds < maxRound)
     {
         rounds++;
         // 防守方减伤 (原版 def 公式应用到 10000 基准)
@@ -276,6 +356,8 @@ void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLv
 {
     kfolAura = aura;
     kfolSetItems(items);
+    // MAXLEVEL 选项若大于 0 且小于传入 maxLvl, 收敛到选项值
+    if (gOptMaxLvl > 0 && gOptMaxLvl < maxLvl) maxLvl = gOptMaxLvl;
     int bestLvlSoFar = startLvl - 1;
 
     for (int pattern = 0; pattern < INIT_PATTERN_NUM; ++pattern)
