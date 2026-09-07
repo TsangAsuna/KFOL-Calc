@@ -43,69 +43,160 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal">
 
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="强壮出现率"
+                android:textSize="14sp" />
+
             <EditText
                 android:id="@+id/npcRateStrgInput"
-                android:layout_width="0dp"
+                android:layout_width="100dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:hint="强壮"
-                android:inputType="number" />
-
-            <EditText
-                android:id="@+id/npcRateToghInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:hint="坚强"
-                android:inputType="number" />
-
-            <EditText
-                android:id="@+id/npcRateFastInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:hint="快速"
-                android:inputType="number" />
-
-            <EditText
-                android:id="@+id/npcRateClvrInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="睿智"
                 android:inputType="number" />
         </LinearLayout>
 
-        <EditText
-            android:id="@+id/coefInput"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="神秘系数 (默认 11)"
-            android:inputType="number" />
+            android:orientation="horizontal">
 
-        <EditText
-            android:id="@+id/auraInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="战力光环 (千分率, 默认 501 = 50.1%)"
-            android:inputType="number" />
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="坚强出现率"
+                android:textSize="14sp" />
 
-        <EditText
-            android:id="@+id/hpHealInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="HP回复量 (默认 8)"
-            android:inputType="number" />
+            <EditText
+                android:id="@+id/npcRateToghInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
 
-        <EditText
-            android:id="@+id/hpStepInput"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="HP step (默认 100, 越大计算越快越粗略)"
-            android:inputType="number" />
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="快速出现率"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/npcRateFastInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="睿智出现率"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/npcRateClvrInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="神秘系数 (默认 11)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/coefInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="战力光环 (千分率)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/auraInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="HP回复量 (默认 8)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/hpHealInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:text="HP step (越大越快越粗)"
+                android:textSize="14sp" />
+
+            <EditText
+                android:id="@+id/hpStepInput"
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:inputType="number" />
+        </LinearLayout>
 
         <!-- 道具数量 -->
         <TextView
