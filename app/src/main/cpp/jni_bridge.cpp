@@ -18,7 +18,8 @@ int kfolGpuInit(void);
 int kfolGpuAvailable(void);
 void kfolCpuMcSimulate(const int*, const int*, const int*, const int*, const int*,
                        int, int, float*, int*);
-extern "C" void kfolSetOptions(const char* text);
+void kfolSetOptions(const char* text);
+void kfolCalcPlayerStats(const int*, int, int, int*);
 void kfolSearchAttrs(int, int, int, int, int, int, const int*, int*, int*);
 void kfolSetItems(const int*);
 void kfolSetHpParams(int, int);
@@ -73,11 +74,10 @@ Java_com_kfol_calc_NativeCore_setFullParams(JNIEnv* env, jobject,
 extern "C" JNIEXPORT void JNICALL
 Java_com_kfol_calc_NativeCore_setOptions(JNIEnv* env, jobject, jstring opts)
 {
-    if (!opts) { extern "C" void kfolSetOptions(const char*); kfolSetOptions(NULL); return; }
+    if (!opts) { kfolSetOptions(NULL); return; }
     const char* str = env->GetStringUTFChars(opts, NULL);
     if (str)
     {
-        extern "C" void kfolSetOptions(const char*);
         kfolSetOptions(str);
         env->ReleaseStringUTFChars(opts, str);
     }
