@@ -381,6 +381,9 @@ static double kfolBattleCache[KFOL_BUCKET_MAX][6];   // [桶][敌人类型] 的�
 static bool kfolBattleCached[6];                     // 每敌人类型是否已缓存 (独立标志, 避免桶0歧义)
 static int kfolBattleCacheLvl = -1;                   // 当前缓存所属层
 static int kfolBucketSize = 100;
+// 递归用静态分布缓冲 (避免 100 层递归 × 16KB 栈数组 = 栈溢出闪退; 搜索单线程所以安全)
+static double kfolTmpHist[KFOL_BUCKET_MAX];
+static double kfolHpHist[KFOL_BUCKET_MAX];
 
 static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
 {
@@ -402,8 +405,8 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
         for (int e = 0; e < 6; ++e) kfolBattleCached[e] = false;
     }
 
-    // 加权剩余HP分布 (只存本层临时)
-    double hpHist[KFOL_BUCKET_MAX];
+    // 加权剩余HP分布 (静态缓冲, 递归安全)
+    double* hpHist = kfolHpHist;
     for (int i = 0; i < histSize; ++i) hpHist[i] = 0;
     int64_t rateSum = 0;
 
@@ -416,9 +419,8 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
         {
             int eStat[STAT_NUM];
             kfolCalcEnemyStats(lvl, e, eStat);
-            double tmp[KFOL_BUCKET_MAX];
-            kfolBattle(pStat, eStat, lvl, tmp, histSize, step);
-            for (int i = 0; i < histSize; ++i) kfolBattleCache[i][e] = tmp[i];
+            kfolBattle(pStat, eStat, lvl, kfolTmpHist, histSize, step);
+            for (int i = 0; i < histSize; ++i) kfolBattleCache[i][e] = kfolTmpHist[i];
             kfolBattleCached[e] = true;
         }
         for (int i = 0; i < histSize; ++i)
