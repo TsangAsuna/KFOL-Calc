@@ -37,6 +37,39 @@ static void getIntArray(JNIEnv* env, jintArray arr, vector<int>& out)
     env->GetIntArrayRegion(arr, 0, n, out.data());
 }
 
+// ---- 进度回调: native -> Kotlin onProgress ----
+static JavaVM* gJvm = NULL;
+static jclass gProgressCls = NULL;
+static jmethodID gOnProgress = NULL;
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_kfol_calc_NativeCore_setProgressListener(JNIEnv* env, jobject, jobject)
+{
+    env->GetJavaVM(&gJvm);
+    if (!gProgressCls)
+    {
+        jclass cls = env->FindClass("com/kfol/calc/NativeCore");
+        if (cls) gProgressCls = (jclass)env->NewGlobalRef(cls);
+        if (gProgressCls) gOnProgress = env->GetStaticMethodID(gProgressCls, "onProgress", "(Ljava/lang/String;)V");
+    }
+    extern void kfolSetProgressCallback(void (*)(const char*));
+    kfolSetProgressCallback(kfolBridgeProgress);
+}
+
+// native 工作线程调用的回调实现 (attach 到 JVM 后调 Kotlin)
+static void kfolBridgeProgress(const char* msg)
+{
+    if (!gJvm || !gProgressCls || !gOnProgress) return;
+    JNIEnv* env = NULL;
+    if (gJvm->GetEnv((void**)&env, JNI_VERSION_1_6) != JNI_OK)
+    {
+        if (gJvm->AttachCurrentThread(&env, NULL) != JNI_OK) return;
+    }
+    jstring jmsg = env->NewStringUTF(msg ? msg : "");
+    env->CallStaticVoidMethod(gProgressCls, gOnProgress, jmsg);
+    env->DeleteLocalRef(jmsg);
+}
+
 // 设置全局参数: enemyRates[6], aura, coef
 extern "C" JNIEXPORT void JNICALL
 Java_com_kfol_calc_NativeCore_setParams(JNIEnv* env, jobject, jintArray rates, jint aura, jint coef)

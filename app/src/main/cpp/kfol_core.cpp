@@ -379,11 +379,29 @@ int kfolBattle(const int* pStat, const int* eStat, int lvl, double* hpHist, int 
 #define KFOL_BUCKET_MAX 2048
 static double kfolBattleCache[KFOL_BUCKET_MAX][6];   // [桶][敌人类型] 的剩余HP分布
 static bool kfolBattleCached[6];                     // 每敌人类型是否已缓存 (独立标志, 避免桶0歧义)
+static int kfolBattleCachedWin[6];                   // 每敌人类型缓存的胜率 (万分率)
 static int kfolBattleCacheLvl = -1;                   // 当前缓存所属层
 static int kfolBucketSize = 100;
 // 递归用静态分布缓冲 (避免 100 层递归 × 16KB 栈数组 = 栈溢出闪退; 搜索单线程所以安全)
+// OpenMP 并行后: 每线程一份 (threadprivate)
 static double kfolTmpHist[KFOL_BUCKET_MAX];
 static double kfolHpHist[KFOL_BUCKET_MAX];
+#pragma omp threadprivate(kfolTmpHist, kfolHpHist, kfolBattleCache, kfolBattleCached, kfolBattleCachedWin, kfolBattleCacheLvl, kfolBucketSize)
+
+// 进度回调 (native -> Java), 每 pattern/层调用
+typedef void (*KfolProgressFn)(const char*);
+static KfolProgressFn gProgressFn = NULL;
+void kfolSetProgressCallback(KfolProgressFn fn) { gProgressFn = fn; }
+static inline void kfolProgress(const char* fmt, ...)
+{
+    if (!gProgressFn) return;
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    gProgressFn(buf);
+}
 
 static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
 {
@@ -408,7 +426,7 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
     // 加权剩余HP分布 (静态缓冲, 递归安全)
     double* hpHist = kfolHpHist;
     for (int i = 0; i < histSize; ++i) hpHist[i] = 0;
-    int64_t rateSum = 0;
+    int64_t rateSum = 0, winSum = 0;
 
     for (int e = eMin; e <= eMax; ++e)
     {
@@ -419,20 +437,21 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
         {
             int eStat[STAT_NUM];
             kfolCalcEnemyStats(lvl, e, eStat);
-            kfolBattle(pStat, eStat, lvl, kfolTmpHist, histSize, step);
+            int winRate = kfolBattle(pStat, eStat, lvl, kfolTmpHist, histSize, step);
             for (int i = 0; i < histSize; ++i) kfolBattleCache[i][e] = kfolTmpHist[i];
+            kfolBattleCachedWin[e] = winRate;
             kfolBattleCached[e] = true;
         }
         for (int i = 0; i < histSize; ++i)
             hpHist[i] += kfolBattleCache[i][e] * rate;
         rateSum += rate;
+        winSum += (int64_t)kfolBattleCachedWin[e] * rate;
     }
     if (rateSum <= 0) return lvl - 1;
     for (int i = 0; i < histSize; ++i) hpHist[i] /= rateSum;
 
-    // 胜率 = 存活桶概率和 (万分率)
-    int64_t winRate = 0;
-    for (int i = 1; i < histSize; ++i) winRate += (int64_t)(hpHist[i] * 10000);
+    // 胜率 = 加权胜率 (直接用 kfolBattle 返回值, 不从分布反推)
+    int64_t winRate = winSum / rateSum;
     if (winRate < gOptMinWinRate) return lvl - 1;  // 打不过本层
 
     // 稀疏化递归: 只对概率 >= 1% 的剩余HP桶继续 (原版 imod 采样近似)
@@ -502,15 +521,26 @@ void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLv
     if (gOptMaxLvl > 0 && gOptMaxLvl < maxLvl) maxLvl = gOptMaxLvl;
     int bestLvlSoFar = startLvl - 1;
 
+    // 8 个 INIT_WEIGHT 起点并行 (8gen3 全核跑满); 每线程独立局部最优, critical 合并
+    #pragma omp parallel for schedule(dynamic, 1)
     for (int pattern = 0; pattern < INIT_PATTERN_NUM; ++pattern)
     {
         int attr[ATTR_NUM];
         kfolInitAttr(pattern, points, attr);
+        kfolProgress("[KFOL] 模式%d/%d 起点 %d %d %d %d %d %d, 初始评估中...",
+                     pattern + 1, INIT_PATTERN_NUM, attr[0], attr[1], attr[2], attr[3], attr[4], attr[5]);
         int curLvl = kfolClimb(startLvl, maxLvl, attr, wpnLvl, amrLvl);
+        kfolProgress("[KFOL] 模式%d/%d 初始通过 %d 层", pattern + 1, INIT_PATTERN_NUM, curLvl);
         if (curLvl > bestLvlSoFar)
         {
-            bestLvlSoFar = curLvl;
-            for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
+            #pragma omp critical
+            {
+                if (curLvl > bestLvlSoFar)
+                {
+                    bestLvlSoFar = curLvl;
+                    for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
+                }
+            }
         }
         // 多步爬山: 步长递减收敛 (等价原版 steps {10,5,2,1})
         const int steps[] = {10, 5, 2, 1};
@@ -545,8 +575,14 @@ void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLv
                     improved = true;
                     if (curLvl > bestLvlSoFar)
                     {
-                        bestLvlSoFar = curLvl;
-                        for (int k = 0; k < ATTR_NUM; ++k) bestAttr[k] = attr[k];
+                        #pragma omp critical
+                        {
+                            if (curLvl > bestLvlSoFar)
+                            {
+                                bestLvlSoFar = curLvl;
+                                for (int k = 0; k < ATTR_NUM; ++k) bestAttr[k] = attr[k];
+                            }
+                        }
                     }
                 }
                 // 原版: 无改进 break; 但我们继续遍历其他 i/j 组合 (爆算到底)

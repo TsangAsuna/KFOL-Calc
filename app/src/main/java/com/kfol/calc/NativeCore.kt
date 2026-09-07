@@ -32,6 +32,19 @@ object NativeCore {
      */
     external fun setOptions(options: String)
 
+    /** 注册进度监听 (native 计算中回调 Kotlin onProgress) */
+    external fun setProgressListener(listener: Any?)
+
+    /** native 进度回调 (由 JNI 从工作线程调用, 需 post 回主线程) */
+    @JvmStatic
+    fun onProgress(msg: String) {
+        listener?.invoke(msg)
+    }
+
+    /** 由 MainActivity 设置, 回调到 UI */
+    @Volatile
+    var listener: ((String) -> Unit)? = null
+
     /** 探测 GPU 可用性: 1=可用 0=不可用 */
     external fun gpuAvailable(): Int
 

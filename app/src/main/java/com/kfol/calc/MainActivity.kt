@@ -169,6 +169,12 @@ class MainActivity : AppCompatActivity() {
         // 初始化基础参数 (NPC出现率/神秘系数/光环/HP参数)
         applyBaseParams()
 
+        // 注册 native 进度回调 -> statusView 显示计算进度
+        NativeCore.listener = { msg ->
+            runOnUiThread { statusView.text = msg }
+        }
+        NativeCore.setProgressListener(this)
+
         // 分配点数输入 -> 不自动填 (最佳加点只在点"开始计算"后输出)
 
         // 一键粘贴装备
