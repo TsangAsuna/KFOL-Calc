@@ -24,8 +24,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var attrDexInput: TextView
     private lateinit var attrIntInput: TextView
     private lateinit var attrResInput: TextView
-    private lateinit var attrStaInput: TextView
-    private lateinit var attrLukInput: TextView
+    private lateinit var attrStaInput: EditText
+    private lateinit var attrLukInput: EditText
     private lateinit var keyLevelsInput: EditText
     private lateinit var itemRemInput: EditText
     private lateinit var itemIzaInput: EditText
@@ -256,18 +256,14 @@ class MainActivity : AppCompatActivity() {
         NativeCore.setOptions(optInput.text.toString())
     }
 
-    /** 填入 8 维 (native 返回 6 主属性, 耐力/幸运按剩余点数启发分配) */
+    /** 填入 6 维搜索结果 (原版搜索变量仅 STR/VIT/AGI/DEX/INT/RES; STA/LUK 用户自定, 计算器不碰) */
     private fun fillAttrFields(attr6: IntArray, points: Int) {
-        val used = attr6.sum()
-        val rest = points - used
         attrStrInput.setText(attr6[0].toString())
         attrVitInput.setText(attr6[1].toString())
         attrAgiInput.setText(attr6[2].toString())
         attrDexInput.setText(attr6[3].toString())
         attrIntInput.setText(attr6[4].toString())
         attrResInput.setText(attr6[5].toString())
-        attrStaInput.setText((rest / 2).toString())
-        attrLukInput.setText((rest - rest / 2).toString())
     }
 
     private fun readItems(): IntArray {
@@ -322,15 +318,14 @@ class MainActivity : AppCompatActivity() {
                     maxLvl, wpnLvl, amrLvl, aura, items)
             }
             val names = arrayOf("力量", "体质", "敏捷", "灵活", "智力", "意志", "耐力", "幸运")
-            // 计算结果自动回填到加点输入框
+            // 计算结果自动回填到加点输入框 (仅 6 维搜索变量, STA/LUK 用户自定不覆盖)
             fillAttrFields(res.attr, effPoints)
             val sb = StringBuilder()
             val attr8 = IntArray(8)
             System.arraycopy(res.attr, 0, attr8, 0, 6)
-            val used = res.attr.sum()
-            val rest = effPoints - used
-            attr8[6] = rest / 2
-            attr8[7] = rest - rest / 2
+            // STA/LUK 用用户输入值 (原版: 非搜索变量, 用户指定)
+            attr8[6] = attrStaInput.text.toString().toIntOrNull() ?: 0
+            attr8[7] = attrLukInput.text.toString().toIntOrNull() ?: 0
             attr8.forEachIndexed { i, v -> sb.append("${names[i]}: $v\n") }
             sb.append("最优通过层数: ${res.bestLvl}\n")
                         sb.append("加点总点数: $points\n")
