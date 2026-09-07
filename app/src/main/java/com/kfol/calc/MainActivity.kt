@@ -335,10 +335,6 @@ class MainActivity : AppCompatActivity() {
             attr8.forEachIndexed { i, v -> sb.append("${names[i]}: $v\n") }
             sb.append("最优通过层数: ${res.bestLvl}\n")
                         sb.append("加点总点数: $points\n")
-            sb.append("道具: 漫画${items[0]}/${items[1]} 钥匙${items[2]} CD${items[3]} 药${items[4]} 券${items[5]}\n")
-            sb.append("NPC出现率: 强壮${npcRateStrgInput.text} 坚强${npcRateToghInput.text} 快速${npcRateFastInput.text} 睿智${npcRateClvrInput.text}\n")
-            sb.append("神秘系数: ${coefInput.text} 光环: $aura\n")
-            sb.append("HP回复: ${hpHealInput.text} HPstep: ${hpStepInput.text}\n")
             sb.append("耗时: ${res.elapsedMs} ms\n")
             sb.append("计算引擎: ${if (res.gpuUsed) "GPU(OpenCL)+CPU" else "CPU(OpenMP)"}")
             resultView.text = sb.toString()

@@ -386,7 +386,20 @@ static int kfolBucketSize = 100;
 // OpenMP 并行后: 每线程一份 (threadprivate)
 static double kfolTmpHist[KFOL_BUCKET_MAX];
 static double kfolHpHist[KFOL_BUCKET_MAX];
-#pragma omp threadprivate(kfolTmpHist, kfolHpHist, kfolBattleCache, kfolBattleCached, kfolBattleCachedWin, kfolBattleCacheLvl, kfolBucketSize)
+// OpenMP threadprivate: 工作线程副本不继承 static 零初始化 (垃圾值!), 用哨兵检测首次进入
+static int kfolThreadInit = 0;
+#pragma omp threadprivate(kfolTmpHist, kfolHpHist, kfolBattleCache, kfolBattleCached, kfolBattleCachedWin, kfolBattleCacheLvl, kfolBucketSize, kfolThreadInit)
+
+// 每线程首次进入时初始化 (OpenMP 副本零初始化只对主线程)
+static inline void kfolEnsureThreadInit()
+{
+    if (kfolThreadInit) return;
+    kfolBattleCacheLvl = -1;
+    for (int e = 0; e < 6; ++e) kfolBattleCached[e] = false;
+    for (int e = 0; e < 6; ++e) kfolBattleCachedWin[e] = 0;
+    kfolBucketSize = 100;
+    kfolThreadInit = 1;
+}
 
 // 进度回调 (native -> Java), 每 pattern/层调用
 typedef void (*KfolProgressFn)(const char*);
@@ -405,6 +418,7 @@ static inline void kfolProgress(const char* fmt, ...)
 
 static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
 {
+    kfolEnsureThreadInit();
     if (hp <= 0 || lvl > maxLvl) return lvl - 1;  // 死了或到顶
     if (lvl == 1 && hp > pStat[LFE]) hp = pStat[LFE];
 
@@ -469,6 +483,7 @@ static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
 // -------- 爬塔: 分布递归评估 (原版 calcAttrForward), 返回期望通过层数 --------
 int kfolClimb(int startLvl, int maxLvl, const int* attr, int wpnLvl, int amrLvl)
 {
+    kfolEnsureThreadInit();
     int pStat[STAT_NUM];
     kfolCalcPlayerStats(attr, wpnLvl, amrLvl, pStat);
     double expect = kfolEvalForward(startLvl, pStat[HP], pStat, maxLvl);
