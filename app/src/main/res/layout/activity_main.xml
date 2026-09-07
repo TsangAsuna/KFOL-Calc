@@ -608,7 +608,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="top"
-            android:hint="【例如：】&#10;Cloth #90442450&#10;1 IMT&#10;4 AMR RFL CRD SLD&#10;8 HEL COF 5 HEL COF 2 SRD COF 5 SLD VIT 5 SRD COF 3 SLD DEX 5 AMR RES 3 HEL COF 2&#10;&#10;Sword #89545072&#10;1 AMT&#10;4 BRC CRT LCH SKL&#10;8 CRT INT 3 BRC AGI 3 BRC COF 4 BRC AGI 5 LCH COF 2 ATK STR 2 SPD AGI 2 BRC INT 5"
+            android:hint="例如：&#10;Cloth #90442450&#10;1 IMT&#10;4 AMR RFL CRD SLD&#10;8 HEL COF 5 HEL COF 2 SRD COF 5 SLD VIT 5 SRD COF 3 SLD DEX 5 AMR RES 3 HEL COF 2&#10;&#10;Sword #89545072&#10;1 AMT&#10;4 BRC CRT LCH SKL&#10;8 CRT INT 3 BRC AGI 3 BRC COF 4 BRC AGI 5 LCH COF 2 ATK STR 2 SPD AGI 2 BRC INT 5"
             android:inputType="textMultiLine"
             android:minLines="6"
             android:maxLines="12"
