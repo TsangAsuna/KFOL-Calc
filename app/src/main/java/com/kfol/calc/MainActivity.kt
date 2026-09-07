@@ -154,11 +154,11 @@ class MainActivity : AppCompatActivity() {
         clampMax10(itemYaoInput)
         clampMax10(itemZheInput)
 
-        // 高级选项默认值: readme 推荐配置
+        // 高级选项默认值: 用户提供的配置
         optInput.setText(
-            "LIMIT 1 200\nVIT MAX 150\nENDLIMIT\n\n" +
-            "MAXROUND 15\nFASTSKILL 4\nTOUGHSKILL 1\n" +
-            "BATTLESTEP 10\nGRIDOPTION 6 3 5\nMINWINRATE 100"
+            "MAXROUND 15\nFASTSKILL 4\nTOUGHSKILL 0\n" +
+            "MAXLEVEL 100\nGRIDOPTION 6 4 6\nBATTLESTEP 1\n" +
+            "MINWINRATE 100\nSERVERBONUS 1\nSIMULATIONMODE 1000\nVERBOSE 1"
         )
 
         // 模式切换
@@ -169,16 +169,7 @@ class MainActivity : AppCompatActivity() {
         // 初始化基础参数 (NPC出现率/神秘系数/光环/HP参数)
         applyBaseParams()
 
-        // 分配点数输入 -> 实时计算最佳加点并自动填入
-        pointsInput.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                val points = s?.toString()?.toIntOrNull() ?: return
-                if (points < 6) return
-                scheduleAttrFill(points)
-            }
-        })
+        // 分配点数输入 -> 不自动填 (最佳加点只在点"开始计算"后输出)
 
         // 一键粘贴装备
         pasteBtn.setOnClickListener {
@@ -263,23 +254,6 @@ class MainActivity : AppCompatActivity() {
         NativeCore.setFullParams(rates, aura, coef, hpHeal, hpStep)
         // 高级选项 (kfol.in 格式, C++ 侧解析生效)
         NativeCore.setOptions(optInput.text.toString())
-    }
-
-    private fun scheduleAttrFill(points: Int) {
-        attrFillJob?.cancel()
-        attrFillJob = scope.launch {
-            delay(400)
-            val wpn = wpnLvlInput.text.toString().toIntOrNull() ?: 12
-            val amr = amrLvlInput.text.toString().toIntOrNull() ?: 6
-            val aura = auraInput.text.toString().toIntOrNull() ?: 501
-            val items = readItems()
-            val res = withContext(Dispatchers.Default) {
-                NativeCore.runSearch(points, 1, maxLvlInput.text.toString().toIntOrNull() ?: 239,
-                    wpn, amr, aura, items)
-            }
-            fillAttrFields(res.attr, points)
-            statusView.text = "已自动计算加点 (${res.elapsedMs}ms, ${if (res.gpuUsed) "GPU+CPU" else "CPU"})"
-        }
     }
 
     /** 填入 8 维 (native 返回 6 主属性, 耐力/幸运按剩余点数启发分配) */

@@ -250,6 +250,9 @@ static inline int kfolRand100(int* rseed)
     return *rseed % 100;
 }
 
+// 前向声明: 递归评估 (原版 calcAttrForward)
+static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl);
+
 // -------- 单场战斗: 原版 calcBattle2 蒙特卡洛 (单局) --------
 // 返回 1=玩家胜 0=玩家败; 回合耗尽/MAXROUND 判败
 static int kfolBattleOne(int* rseed, const int* pStat, const int* eStat, int lvl)
@@ -346,7 +349,7 @@ static int kfolBattleOne(int* rseed, const int* pStat, const int* eStat, int lvl
 // 返回胜率万分率 0-10000
 int kfolBattle(const int* pStat, const int* eStat, int lvl)
 {
-    int sims = gOptSimulationMode > 0 ? gOptSimulationMode : 100;
+    int sims = gOptSimulationMode > 0 ? gOptSimulationMode : 1000;
     // 种子: 由双方 stat 混合生成 (原版 crc64 的简化)
     int rseed = (pStat[ATK] * 2654435761u ^ eStat[ATK] * 40503u ^ pStat[LFE] * 13u ^ lvl * 97u) & 0x7FFFFFFF;
     if (rseed == 0) rseed = 1;
@@ -450,12 +453,14 @@ void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLv
             bestLvlSoFar = curLvl;
             for (int i = 0; i < ATTR_NUM; ++i) bestAttr[i] = attr[i];
         }
+        // 多步爬山: 步长递减收敛 (等价原版 steps {10,5,2,1})
         const int steps[] = {10, 5, 2, 1};
         for (size_t si = 0; si < sizeof(steps) / sizeof(steps[0]); ++si)
         {
             int step = steps[si];
             bool improved = true;
-            for (int iter = 0; iter < 8 && improved; ++iter)
+            // 原版每步 iter=8; 爆算到底跑满, 不提前收敛
+            for (int iter = 0; iter < 8; ++iter)
             {
                 improved = false;
                 int bi = -1, bj = -1, bestDeltaLvl = curLvl;
@@ -485,6 +490,7 @@ void kfolSearchAttrs(int points, int startLvl, int maxLvl, int wpnLvl, int amrLv
                         for (int k = 0; k < ATTR_NUM; ++k) bestAttr[k] = attr[k];
                     }
                 }
+                // 原版: 无改进 break; 但我们继续遍历其他 i/j 组合 (爆算到底)
             }
         }
     }
