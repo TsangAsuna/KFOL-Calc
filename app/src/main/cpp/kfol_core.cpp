@@ -253,149 +253,206 @@ static inline int kfolRand100(int* rseed)
 // 前向声明: 递归评估 (原版 calcAttrForward)
 static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl);
 
-// -------- 单场战斗: 原版 calcBattle2 蒙特卡洛 (单局) --------
-// 返回 1=玩家胜 0=玩家败; 回合耗尽/MAXROUND 判败
-static int kfolBattleOne(int* rseed, const int* pStat, const int* eStat, int lvl)
+// -------- 单场战斗: 蒙特卡洛模拟 (SIMULATIONMODE 次, 原版 calcBattle2) --------
+// 返回胜率万分率 0-10000; 若 hpHist 非空, 同时统计剩余HP概率分布 (按 step 桶)
+int kfolBattle(const int* pStat, const int* eStat, int lvl, double* hpHist, int hpHistSize, int step)
 {
-    int pHp = pStat[HP], eHp = eStat[HP];
-    int pSpd = pStat[SPD], eSpd = eStat[SPD];
-    int pAtk = pStat[ATK], eAtk = eStat[ATK];
-    int pSld = 0;  // 护盾 (装备 SLD, 当前简化 0)
-    int round = 0, pTm = 0, eTm = 0;
-    int maxRound = gOptMaxRound > 0 ? gOptMaxRound : MAX_ROUND;
-
-    for (;;)
+    int sims = gOptSimulationMode > 0 ? gOptSimulationMode : 1000;
+    int rseed = (pStat[ATK] * 2654435761u ^ eStat[ATK] * 40503u ^ pStat[LFE] * 13u ^ lvl * 97u) & 0x7FFFFFFF;
+    if (rseed == 0) rseed = 1;
+    if (hpHist && hpHistSize > 0)
+        for (int i = 0; i < hpHistSize; ++i) hpHist[i] = 0;
+    int wins = 0;
+    for (int s = 0; s < sims; ++s)
     {
-        // 剑士越少血攻速越高 (原版 swdEnc)
-        int swdEnc = 0;
-        int pSpd2 = pSpd + pSpd * swdEnc / 100;
-        if (pTm < pSpd2 && eTm < eSpd)
+        rseed = (rseed * 1103515245 + 12345) & 0x7FFFFFFF;
+        int pHp = pStat[HP];
+        int eHp = eStat[HP];
+        int pSpd = pStat[SPD], eSpd = eStat[SPD];
+        int pAtk = pStat[ATK], eAtk = eStat[ATK];
+        int pSld = 0;
+        int round = 0, pTm = 0, eTm = 0;
+        int maxRound = gOptMaxRound > 0 ? gOptMaxRound : MAX_ROUND;
+        for (;;)
         {
-            int tmInc = pSpd2 - pTm <= eSpd - eTm ? pSpd2 - pTm : eSpd - eTm;
-            pTm += tmInc; eTm += tmInc;
-        }
-        if (eTm >= eSpd)  // 玩家回合
-        {
-            eTm = 0;
-            int tecRate = pStat[TEC] > 99 ? 99 : pStat[TEC];
-            int crtRate = pStat[CRT] > 99 ? 99 : pStat[CRT];
-            bool isTec = kfolRand100(rseed) < tecRate;
-            bool isCrt = kfolRand100(rseed) < crtRate;
-            int64_t dmg0 = pAtk;
-            if (isCrt) dmg0 *= pStat[ACR]; else dmg0 *= 100;
-            if (isTec) dmg0 = dmg0 + (int64_t)pStat[MAG] * 100;
-            if (isTec) dmg0 = dmg0 * pStat[ASR] / 10000 * 100;
-            int eDef = eStat[PRES] >= 0 ? ((int64_t)eStat[PRES] * 20001 + 150) / (eStat[PRES] * 2 + 300) : 0;
-            if (eDef > 9900) eDef = 9900;
-            int dmg = (int)((dmg0 * (10000 - eDef) + 999999) / 1000000) + pStat[LCH];
-            eHp -= dmg;
-            pHp += pStat[LCH];
-            if (pHp > pStat[LFE]) pHp = pStat[LFE];
-        }
-        else  // 敌人回合
-        {
-            pTm = 0;
-            bool isTec = kfolRand100(rseed) < eStat[TEC];
-            bool isCrt = kfolRand100(rseed) < eStat[CRT];
-            int64_t dmg = (isTec ? 0 : eAtk * (isCrt ? 2 : 1)) + (isTec ? eStat[MAG] : 0);
-            if (eStat[CRT] == 0 && isCrt) dmg = 0;
-            if (eStat[SKL] == FAST && lvl > 100 && isCrt) dmg *= 3;  // 快速怪100层后暴击3倍
-            if (pSld >= dmg) { pSld -= dmg; dmg = 1; }
-            else { dmg -= pSld; pSld = 0; }
-            int pDef = pStat[PRES] >= 0 ? ((int64_t)pStat[PRES] * 20001 + 150) / (pStat[PRES] * 2 + 300) : 0;
-            if (pDef > 9900) pDef = 9900;
-            dmg = (dmg * (10000 - pDef) + 9999) / 10000;
-            pHp -= dmg;
-            if (isTec)
+            int swdEnc = 0;
+            int pSpd2 = pSpd;
+            if (pTm < pSpd2 && eTm < eSpd)
             {
-                switch (eStat[SKL])
+                int tmInc = pSpd2 - pTm <= eSpd - eTm ? pSpd2 - pTm : eSpd - eTm;
+                pTm += tmInc; eTm += tmInc;
+            }
+            if (eTm >= eSpd)
+            {
+                eTm = 0;
+                int tecRate = pStat[TEC] > 99 ? 99 : pStat[TEC];
+                int crtRate = pStat[CRT] > 99 ? 99 : pStat[CRT];
+                bool isTec = kfolRand100(&rseed) < tecRate;
+                bool isCrt = kfolRand100(&rseed) < crtRate;
+                int64_t dmg0 = pAtk;
+                if (isCrt) dmg0 *= pStat[ACR]; else dmg0 *= 100;
+                if (isTec) dmg0 = dmg0 + (int64_t)pStat[MAG] * 100;
+                if (isTec) dmg0 = dmg0 * pStat[ASR] / 10000 * 100;
+                int eDef = eStat[PRES] >= 0 ? ((int64_t)eStat[PRES] * 20001 + 150) / (eStat[PRES] * 2 + 300) : 0;
+                if (eDef > 9900) eDef = 9900;
+                int dmg = (int)((dmg0 * (10000 - eDef) + 999999) / 1000000) + pStat[LCH];
+                eHp -= dmg;
+                pHp += pStat[LCH];
+                if (pHp > pStat[LFE]) pHp = pStat[LFE];
+            }
+            else
+            {
+                pTm = 0;
+                bool isTec = kfolRand100(&rseed) < eStat[TEC];
+                bool isCrt = kfolRand100(&rseed) < eStat[CRT];
+                int64_t dmg = (isTec ? 0 : eAtk * (isCrt ? 2 : 1)) + (isTec ? eStat[MAG] : 0);
+                if (eStat[SKL] == FAST && lvl > 100 && isCrt) dmg *= 3;
+                if (pSld >= dmg) { pSld -= dmg; dmg = 1; }
+                else { dmg -= pSld; pSld = 0; }
+                int pDef = pStat[PRES] >= 0 ? ((int64_t)pStat[PRES] * 20001 + 150) / (pStat[PRES] * 2 + 300) : 0;
+                if (pDef > 9900) pDef = 9900;
+                dmg = (dmg * (10000 - pDef) + 9999) / 10000;
+                pHp -= dmg;
+                if (isTec)
                 {
-                    case TOGH: eHp += eStat[LFE] / 10; break;  // 坚韧回血
-                    case NORM: eAtk += eAtk / 4; break;        // 普通叠攻
-                    case FAST:
+                    switch (eStat[SKL])
                     {
-                        int newSpd = eSpd + eSpd / 2;
-                        if (newSpd > 100000000) newSpd = 100000000;
-                        eTm += newSpd - eSpd; eSpd = newSpd;
-                        break;
+                        case TOGH: eHp += eStat[LFE] / 10; break;
+                        case NORM: eAtk += eAtk / 4; break;
+                        case FAST:
+                        {
+                            int newSpd = eSpd + eSpd / 2;
+                            if (newSpd > 100000000) newSpd = 100000000;
+                            eTm += newSpd - eSpd; eSpd = newSpd;
+                            break;
+                        }
                     }
                 }
+                if (pHp > pStat[LFE]) pHp = pStat[LFE];
+                if (eHp > eStat[LFE]) eHp = eStat[LFE];
+                if (eStat[SKL] == FAST && lvl > 100 && kfolRand100(&rseed) < 30)
+                {
+                    int newSpd = eSpd * 3 / 10;
+                    if (newSpd > 100000000) newSpd = 100000000;
+                    eTm += newSpd - eSpd; eSpd = newSpd;
+                }
             }
-            if (pHp > pStat[LFE]) pHp = pStat[LFE];
-            if (eHp > eStat[LFE]) eHp = eStat[LFE];
-            if (eStat[SKL] == FAST && lvl > 100 && kfolRand100(rseed) < 30)
+            ++round;
+            if (eHp < 1)
             {
-                int newSpd = eSpd * 3 / 10;
+                if (hpHist && step > 0)
+                {
+                    int idx = pHp / step;
+                    if (idx >= hpHistSize) idx = hpHistSize - 1;
+                    hpHist[idx] += 1.0 / sims;
+                }
+                ++wins;
+                break;
+            }
+            if (pHp < 1)
+            {
+                if (hpHist && step > 0) hpHist[0] += 1.0 / sims;  // 死掉 → 剩余 0 桶
+                break;
+            }
+            if (round >= maxRound)
+            {
+                if (eHp < pHp) { if (hpHist && step > 0) { int idx = pHp / step; if (idx >= hpHistSize) idx = hpHistSize - 1; hpHist[idx] += 1.0 / sims; } ++wins; }
+                else { if (hpHist && step > 0) hpHist[0] += 1.0 / sims; }
+                break;
+            }
+            if (round >= 20)
+            {
+                eAtk *= 2;
+                if (eAtk > 30000000) eAtk = 30000000;
+                int newSpd = eSpd * 2;
                 if (newSpd > 100000000) newSpd = 100000000;
                 eTm += newSpd - eSpd; eSpd = newSpd;
             }
         }
-        ++round;
-        if (eHp < 1) return 1;
-        if (pHp < 1) return 0;
-        if (round >= maxRound) return eHp < pHp ? 1 : 0;  // 回合耗尽判残血多者胜
-        if (round >= 20)  // 20 回合后敌人狂暴 (原版)
-        {
-            eAtk *= 2;
-            if (eAtk > 30000000) eAtk = 30000000;
-            int newSpd = eSpd * 2;
-            if (newSpd > 100000000) newSpd = 100000000;
-            eTm += newSpd - eSpd; eSpd = newSpd;
-        }
-    }
-}
-
-// -------- 单场战斗: 蒙特卡洛模拟 (SIMULATIONMODE 次, 原版 calcBattle2) --------
-// 返回胜率万分率 0-10000
-int kfolBattle(const int* pStat, const int* eStat, int lvl)
-{
-    int sims = gOptSimulationMode > 0 ? gOptSimulationMode : 1000;
-    // 种子: 由双方 stat 混合生成 (原版 crc64 的简化)
-    int rseed = (pStat[ATK] * 2654435761u ^ eStat[ATK] * 40503u ^ pStat[LFE] * 13u ^ lvl * 97u) & 0x7FFFFFFF;
-    if (rseed == 0) rseed = 1;
-    int wins = 0;
-    for (int s = 0; s < sims; ++s)
-    {
-        rseed = (rseed * 1103515245 + 12345) & 0x7FFFFFFF;  // 每局换种
-        wins += kfolBattleOne(&rseed, pStat, eStat, lvl);
     }
     return wins * 10000 / sims;
 }
 
-// -------- 爬塔: 从 startLvl 逐层, 按 enemyRate 加权的期望剩余 HP --------
+// -------- 递归评估 (原版 calcAttrForward): 给定层+HP, 逐层战斗->剩余HP分布->递归下一层 --------
+// 返回期望通过层数 (double)
+// ponytail: 无缓存递归会指数爆炸; 用全局战斗结果缓存 (同层同敌人只模拟一次) + 稀疏化 (>1%概率桶才递归)
+#define KFOL_BUCKET_MAX 2048
+static double kfolBattleCache[KFOL_BUCKET_MAX][6];   // [桶][敌人类型] 的剩余HP分布
+static bool kfolBattleCached[6];                     // 每敌人类型是否已缓存 (独立标志, 避免桶0歧义)
+static int kfolBattleCacheLvl = -1;                   // 当前缓存所属层
+static int kfolBucketSize = 100;
+
+static double kfolEvalForward(int lvl, int hp, const int* pStat, int maxLvl)
+{
+    if (hp <= 0 || lvl > maxLvl) return lvl - 1;  // 死了或到顶
+    if (lvl == 1 && hp > pStat[LFE]) hp = pStat[LFE];
+
+    // 本层敌人加权: 普通层 NORM..CLVR, 10的倍数层 BOSS
+    int eMin = lvl % 10 == 0 ? BOSS : NORM;
+    int eMax = lvl % 10 == 0 ? BOSS : CLVR;
+    int step = gOptBattleStep > 0 ? gOptBattleStep : 100;
+    kfolBucketSize = step;
+    int histSize = pStat[LFE] / step + 2;
+    if (histSize > KFOL_BUCKET_MAX) histSize = KFOL_BUCKET_MAX;
+
+    // 本层战斗结果缓存: 若缓存层改变则全清
+    if (kfolBattleCacheLvl != lvl)
+    {
+        kfolBattleCacheLvl = lvl;
+        for (int e = 0; e < 6; ++e) kfolBattleCached[e] = false;
+    }
+
+    // 加权剩余HP分布 (只存本层临时)
+    double hpHist[KFOL_BUCKET_MAX];
+    for (int i = 0; i < histSize; ++i) hpHist[i] = 0;
+    int64_t rateSum = 0;
+
+    for (int e = eMin; e <= eMax; ++e)
+    {
+        int rate = kfolEnemyRate[e];
+        if (rate <= 0) continue;
+        // 用缓存分布 (独立标志), 未算则模拟
+        if (!kfolBattleCached[e])
+        {
+            int eStat[STAT_NUM];
+            kfolCalcEnemyStats(lvl, e, eStat);
+            double tmp[KFOL_BUCKET_MAX];
+            kfolBattle(pStat, eStat, lvl, tmp, histSize, step);
+            for (int i = 0; i < histSize; ++i) kfolBattleCache[i][e] = tmp[i];
+            kfolBattleCached[e] = true;
+        }
+        for (int i = 0; i < histSize; ++i)
+            hpHist[i] += kfolBattleCache[i][e] * rate;
+        rateSum += rate;
+    }
+    if (rateSum <= 0) return lvl - 1;
+    for (int i = 0; i < histSize; ++i) hpHist[i] /= rateSum;
+
+    // 胜率 = 存活桶概率和 (万分率)
+    int64_t winRate = 0;
+    for (int i = 1; i < histSize; ++i) winRate += (int64_t)(hpHist[i] * 10000);
+    if (winRate < gOptMinWinRate) return lvl - 1;  // 打不过本层
+
+    // 稀疏化递归: 只对概率 >= 1% 的剩余HP桶继续 (原版 imod 采样近似)
+    double total = 0;
+    for (int i = 0; i < histSize; ++i)
+    {
+        if (hpHist[i] < 0.01) continue;  // <1% 忽略
+        int nextHp = i * step;
+        if (nextHp < 1) continue;
+        total += kfolEvalForward(lvl + 1, nextHp, pStat, maxLvl) * hpHist[i];
+    }
+    return total;
+}
+
+// -------- 爬塔: 分布递归评估 (原版 calcAttrForward), 返回期望通过层数 --------
 int kfolClimb(int startLvl, int maxLvl, const int* attr, int wpnLvl, int amrLvl)
 {
     int pStat[STAT_NUM];
     kfolCalcPlayerStats(attr, wpnLvl, amrLvl, pStat);
-    int hp = pStat[HP];
-    int lvl = startLvl;
-    while (lvl <= maxLvl)
-    {
-        // 原版 evalAttrAtLevel: 每层按出现率加权胜率, >= MINWINRATE 才通过
-        int eMin = lvl % 10 == 0 ? BOSS : NORM;
-        int eMax = lvl % 10 == 0 ? BOSS : CLVR;
-        // 加权胜率 (万分率)
-        int64_t wSum = 0, wWin = 0;
-        for (int e = eMin; e <= eMax; ++e)
-        {
-            int rate = kfolEnemyRate[e];
-            if (rate <= 0) continue;
-            int eStat[STAT_NUM];
-            kfolCalcEnemyStats(lvl, e, eStat);
-            int winRate = kfolBattle(pStat, eStat, lvl);
-            wSum += rate;
-            wWin += (int64_t)winRate * rate;
-        }
-        if (wSum <= 0) break;
-        int avgWinRate = (int)(wWin / wSum);
-        if (avgWinRate < gOptMinWinRate) break;  // 胜率不足, 停在这里
-        // 通过本层: HP 按剩余期望 (简化: 用加权胜率近似保留比例)
-        hp = pStat[LFE] * avgWinRate / 10000 + 100;
-        if (hp > pStat[LFE]) hp = pStat[LFE];
-        pStat[HP] = hp;
-        lvl++;
-    }
-    return lvl - 1;
+    double expect = kfolEvalForward(startLvl, pStat[HP], pStat, maxLvl);
+    // 期望层数转整数 (保留小数部分到 0.5 进位)
+    return (int)(expect + 0.5);
 }
 
 // -------- 加点搜索: 原版 INIT_WEIGHT 权重起点 + 多步爬山 (searchBestAttr) --------

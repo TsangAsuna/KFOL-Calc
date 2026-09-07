@@ -25,7 +25,7 @@ void kfolSetItems(const int*);
 void kfolSetHpParams(int, int);
 void kfolApplyItemDebuff(int*);
 void kfolCalcEnemyStats(int, int, int*);
-int kfolBattle(const int*, const int*, int);
+int kfolBattle(const int*, const int*, int, double*, int, int);
 int kfolClimb(int, int, const int*, int, int);
 }
 
@@ -128,13 +128,13 @@ Java_com_kfol_calc_NativeCore_evaluateLayer(JNIEnv* env, jobject,
     pStat[11] = hp;
     jintArray res = env->NewIntArray(6);
     jint tmp[6];
-    extern int kfolBattle(const int*, const int*, int);
+    extern int kfolBattle(const int*, const int*, int, double*, int, int);
     for (int e = 0; e < 6; ++e)
     {
         int eStat[12];
         extern void kfolCalcEnemyStats(int, int, int*);
         kfolCalcEnemyStats(lvl, e, eStat);
-        tmp[e] = kfolBattle(pStat, eStat, lvl);
+        tmp[e] = kfolBattle(pStat, eStat, lvl, NULL, 0, 0);
     }
     env->SetIntArrayRegion(res, 0, 6, tmp);
     return res;
