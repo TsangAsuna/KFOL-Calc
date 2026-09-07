@@ -128,15 +128,19 @@ class MainActivity : AppCompatActivity() {
         itemYaoInput.setText("0")
         itemZheInput.setText("0")
 
-        // 药/券上限 10: 输入超上限自动回写
-        itemYaoInput.filters = arrayOf(android.text.InputFilter { src, _, _, _, _, _ ->
-            val s = src.toString()
-            if (s.isNotEmpty() && (s.toIntOrNull() ?: 0) > 10) "" else s
-        })
-        itemZheInput.filters = arrayOf(android.text.InputFilter { src, _, _, _, _, _ ->
-            val s = src.toString()
-            if (s.isNotEmpty() && (s.toIntOrNull() ?: 0) > 10) "" else s
-        })
+        // 药/券上限 10: 输入完成后检查完整文本, 超上限回写 10
+        fun clampMax10(view: EditText) {
+            view.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    val v = s?.toString()?.toIntOrNull() ?: return
+                    if (v > 10) view.setText("10")
+                }
+            })
+        }
+        clampMax10(itemYaoInput)
+        clampMax10(itemZheInput)
 
         // 高级选项默认值: readme 推荐配置
         optInput.setText(
